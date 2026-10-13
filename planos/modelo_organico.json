@@ -1,0 +1,20 @@
+{
+  "_sobre": "Modelo do plano do dia (versão ORGÂNICO, sem tela final, até 179,5 s pro Trial Reel/Shorts). O montar_plano_dia.py copia daqui; a semana vem de --semana.",
+  "destino": "${SAIDA_DIR}/SEMXX/modelo",
+  "fila": "SEMXX-modelo",
+  "acel_max": 1.08,
+  "tela_final": "${TELA_FINAL}",
+  "pausa": 0.5,
+  "fusao": 0.6,
+  "fade_voz": 0.3,
+  "sfx": "",
+  "sfx_gain_db": -8,
+  "sfx_pico": 0.256,
+  "flash": 0.12,
+  "pad_antes": 0.1,
+  "pad_depois": 0.15,
+  "variantes": [
+    {"id": "ORG", "subpasta": "orgânico", "prefixo": "[AA] [SS] [ORG] ", "tela_final": false, "dur_max": 179.5}
+  ],
+  "videos": []
+}

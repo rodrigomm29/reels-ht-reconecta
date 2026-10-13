@@ -1,0 +1,10 @@
+# Vocabulário de grafias pro Scribe (keyterms): uma palavra ou expressão por linha, até 50 caracteres.
+# Copie para scribe/vocab.txt (fica fora do git) e ponha as grafias que a transcrição costuma errar:
+# nome da marca, dos produtos, de pessoas que aparecem nos vídeos, termos técnicos.
+RECONECTA
+SUPERCASO
+harmonização facial
+consulta paga
+captação
+WhatsApp
+Instagram

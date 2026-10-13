@@ -1,0 +1,26 @@
+# configuração local e segredos
+scribe/vocab.txt
+config.env
+*.env.local
+cookies*.txt
+
+# dados de trabalho (gerados a cada semana; têm caminhos da máquina e IDs internos)
+dados/
+saida/
+publicar/filas/
+legendas/
+planos/*
+!planos/modelo_organico.json
+!planos/_instrucoes_ganchos.md
+!planos/exemplo/
+
+# gerados
+bin/
+__pycache__/
+*.pyc
+*.part
+*.part.mp4
+
+# macOS / exFAT
+.DS_Store
+._*
