@@ -1,5 +1,5 @@
 {
-  "_sobre": "Modelo do plano do dia (versão ORGÂNICO, sem tela final, até 179,5 s pro Trial Reel/Shorts). O montar_plano_dia.py copia daqui; a semana vem de --semana.",
+  "_sobre": "Modelo do plano do dia: ORG (orgânico, sem tela final, até 179,5 s pro Trial Reel/Shorts) e AD (anúncio, Reel inteiro; com tela final de CTA só se TELA_FINAL estiver preenchido no config.env, \"auto\"). O montar_plano_dia.py copia daqui; a semana vem de --semana.",
   "destino": "${SAIDA_DIR}/SEMXX/modelo",
   "fila": "SEMXX-modelo",
   "acel_max": 1.08,
@@ -14,7 +14,8 @@
   "pad_antes": 0.1,
   "pad_depois": 0.15,
   "variantes": [
-    {"id": "ORG", "subpasta": "orgânico", "prefixo": "[AA] [SS] [ORG] ", "tela_final": false, "dur_max": 179.5}
+    {"id": "ORG", "subpasta": "orgânico", "prefixo": "[AA] [SS] [ORG] ", "tela_final": false, "dur_max": 179.5},
+    {"id": "AD", "subpasta": "anúncio", "prefixo": "[AA] [SS] [AD] ", "tela_final": "auto"}
   ],
   "videos": []
 }

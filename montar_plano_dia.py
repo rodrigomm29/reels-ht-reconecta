@@ -58,8 +58,8 @@ def main():
     ap.add_argument('--simular', action='store_true')
     ap.add_argument('--estilo', default='peles', choices=['peles', 'clean', 'dividida'],
                     help='clean (12/10): limpa+corte / zoom+flash / texto+corte; dividida (13/10): B-roll em cima, '
-                         'Ana embaixo, legenda na emenda, headline 4 s')
-    ap.add_argument('--dividida-y', help='dividida: JSON {shortcode: {"y": topo da janela da Ana}}')
+                         'pessoa embaixo, legenda na emenda, headline 4 s')
+    ap.add_argument('--dividida-y', help='dividida: JSON {shortcode: {"y": topo da janela da pessoa}}')
     ap.add_argument('--broll-triagem', help='dividida: JSON da triagem ({"pasta", "ok": [...]}) do B-roll')
     a = ap.parse_args()
     a.modelo = a.modelo or os.path.join(config.PROJETO, 'planos', 'modelo_organico.json')
@@ -67,6 +67,9 @@ def main():
     for k in ('destino', 'tela_final', 'sfx'):          # o _template.json usa ${SAIDA_DIR}, ${TELA_FINAL}...
         if isinstance(modelo.get(k), str):
             modelo[k] = config.expandir(modelo[k])
+    for var in modelo['variantes']:                # "auto": tela final só se o TELA_FINAL existir
+        if var.get('tela_final') == 'auto':
+            var['tela_final'] = bool(modelo.get('tela_final')) and os.path.isfile(modelo['tela_final'])
     cy = json.loads(a.cy)
     sem = set(a.sem_momento)
     semana = a.semana or modelo['fila'].split('-')[0]              # SEM41

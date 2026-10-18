@@ -29,14 +29,15 @@ import numpy as np
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 from montar_ht_hooks import corte_do_gancho  # noqa: E402
+import config  # noqa: E402
 
 OCR = os.path.join(AQUI, 'bin', 'ocr_legenda')
-FAIXA_Y, FAIXA_H = 1200, 440          # faixa da legenda em 1080×1920 (medida nos Reels da Ana)
-W, H = 540, 220                       # faixa reduzida (1/2): em 1/4 a legenda de letra pequena (DeASuSYATAR) some
+FAIXA_Y, FAIXA_H = config.LEGENDA_FAIXA_Y, config.LEGENDA_FAIXA_H   # faixa da legenda em 1080×1920 (config.env)
+W, H = 540, FAIXA_H // 2              # faixa reduzida (1/2): em 1/4 a legenda de letra pequena (DeASuSYATAR) some
 FPS = 30
 LIMIAR_BRANCO = 240
 TROCA = 0.35
-MIN_TEXTO = 240                       # pixels de texto em 540×220 (legenda pequena dá 700+, blusa branca dá 1)
+MIN_TEXTO = config.LEGENDA_MIN_TEXTO  # pixels de texto na faixa reduzida (Ana: 240; legenda pequena dá 700+, blusa branca dá 1)
 MIN_BLOCO = 0.15
 TETO_INI, TETO_FIM = 0.25, 0.35       # s de bloco errado que o ajuste fino resolve sem trocar o gancho
 

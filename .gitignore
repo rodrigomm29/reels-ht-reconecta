@@ -9,9 +9,11 @@ dados/
 saida/
 publicar/filas/
 legendas/
+brutos/
 planos/*
 !planos/modelo_organico.json
 !planos/_instrucoes_ganchos.md
+!planos/_instrucoes_bruto.md
 !planos/exemplo/
 
 # gerados

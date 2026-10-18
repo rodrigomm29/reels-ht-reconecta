@@ -34,7 +34,7 @@ def achar(pasta, nome):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('plano')
-    ap.add_argument('--versao', nargs='+', default=['HT', 'ORG'])
+    ap.add_argument('--versao', nargs='+', help='ex.: ORG AD (padrão: todas as versões do plano)')
     ap.add_argument('--so', nargs='*', help='só estes rótulos (ex.: VD012_B VD013_A)')
     ap.add_argument('--forcar', action='store_true')
     ap.add_argument('--parado', type=int, default=120, help='s sem o .part crescer pra considerar travado')
@@ -51,6 +51,9 @@ def main():
         log.write(linha + '\n')
 
     variantes = {v['id']: v for v in plano['variantes']}
+    a.versao = a.versao or list(variantes)
+    if faltam := [v for v in a.versao if v not in variantes]:
+        sys.exit(f"versão {', '.join(faltam)} não está no plano (tem: {', '.join(variantes)})")
     fila = []
     for vid in a.versao:
         for v in plano['videos']:

@@ -11,6 +11,11 @@ O estilo atual é a **tela dividida**:
 
 Os estilos antigos (**clean** e **peles**) continuam disponíveis.
 
+> **Adaptado para a Dra. Fernanda Porto** (@drafernanda.porto, rejuvenescimento facial, João Pessoa) em 18/10/2026.
+> - **Ganchos:** as instruções dos agentes em `planos/_instrucoes_ganchos.md` falam com pacientes, não com donos de clínica. A = dor e identificação, B = prova, C = objeção ou mito.
+> - **Estilo:** os Reels dela já são editados, com fala intercalada com cenas da clínica. Por isso, comece com `--estilo clean`. A `dividida` pede acervo de B-roll próprio e uma janela fixa do rosto, que não acompanha as trocas de cena.
+> - **Anúncio:** o plano gera também a versão `AD`, com o Reel inteiro, na subpasta `anúncio/`. Se `TELA_FINAL` estiver preenchido, ela termina na tela de CTA. Os anúncios sobem à mão no Gerenciador de Anúncios; o Publer só agenda o orgânico.
+
 Rotina típica: 7 Reels base × 3 ganchos = **21 vídeos por dia**, postados a partir das 19:00 com 2 minutos de intervalo.
 
 ```
@@ -122,6 +127,13 @@ O B-roll é o que aparece na metade de cima: clipes curtos, sem áudio, trocando
    - **texto grande queimado** no quadro, que briga com a legenda e a headline;
    - clipe **parado** demais.
 
+   Para a Dra. Fernanda, o B-roll ideal são cenas dela mesma: clínica, aparelho, pele em close, bastidor.
+   Exclua também:
+   - **meme, celebridade ou humor**;
+   - **agulha, sangue ou close** de procedimento que assuste;
+   - **paciente sem autorização** de imagem;
+   - **antes e depois de terceiros**.
+
 ---
 
 ## 5. A rotina do dia
@@ -192,7 +204,7 @@ Se o `blocos_legenda.py` mandar **TROCAR** algum gancho, peça outro ao agente e
 
 ### 5.6 Render: um vídeo por vez
 ```bash
-caffeinate -m python3 lote_peles.py planos/ht_sem43_segunda.json --versao ORG
+caffeinate -m python3 lote_peles.py planos/ht_sem43_segunda.json --versao ORG AD
 ```
 - **Tempo e memória:** cada vídeo leva ~1 min 45 s e usa ~1,2 GB de memória.
 - **Vigia:** o lote tem um vigia. Se um render travar, ele mata e refaz. Se o vídeo passar de 195 MB, refaz mais
@@ -228,6 +240,21 @@ python3 publer_postar.py postar SEM43-segunda-ht --rede instagram --inicio "2026
 - **Limite do Publer:** 25 posts no Instagram por conta a cada 24 h, contando os carrosséis do dia. 21 vídeos + 2 carrosséis cabem.
 - **Fila com nome único:** a fila de vídeos termina em `-ht`. Não reaproveite o nome de uma fila de carrossel.
 - **Se faltar algum vídeo:** o `fila.py montar` avisa quais. Renderize os que faltam e rode de novo.
+
+### 5.9 Vídeos brutos (ainda não postados)
+Uma subpasta de `brutos/entrada/` = um vídeo final. Dentro dela vão os takes da fala (`.MOV`/`.mp4`, em qualquer ordem: eles são juntados pela hora de gravação) e as imagens de apoio, como o antes e depois.
+```bash
+python3 ferramentas/importar_brutos.py teste1        # normaliza, junta os takes e transcreve → id BR001
+```
+Peça ao Claude Code um agente seguindo `planos/_instrucoes_bruto.md` para `BR001`. Ele grava `dados/brutos/BR001_edicao.json`, com os trechos que ficam e onde entra a imagem. Depois:
+```bash
+python3 ferramentas/editar_bruto.py BR001             # versão SEM gancho → saida/brutos/BR001/sem gancho/
+python3 ferramentas/novo_lote.py --semana SEM43 --dia terça --primeiro 8 BR001E
+```
+A partir daí, siga a rotina normal (5.3 em diante) com o id `BR001E` para as 3 versões com gancho.
+- **Edição:** emendas com 0,30 s de pausa (o ritmo natural dela), enquadramento alternado (normal e 1,1×) a cada trecho e legenda palavra por palavra no terço de baixo.
+- **Antes e depois:** no máximo **2,5 s** na tela por aparição, travado no script, porque o Meta barra acima de 3 s.
+- **Ganchos:** os agentes não usam o `blocos_legenda.py` nesses vídeos (a legenda é nossa, sincronizada com a fala) e cortam pela fronteira das palavras.
 
 ---
 

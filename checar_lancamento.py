@@ -18,7 +18,10 @@ import config  # noqa: E402
 AQUI = os.path.dirname(os.path.abspath(__file__))
 BASE = config.REELS_BASE
 PADRAO = re.compile(r'supercaso|super caso|desafio|lançamento|ingresso|inscriç|janela abre|mansão|workshop|'
-                    r'ao vivo|link na bio|vagas', re.I)
+                    r'ao vivo|link na bio|vagas|'
+                    # Dra. Fernanda (18/10/2026): oferta, preço e data não entram em Reel base
+                    r'promoç|desconto|\bpreço|\bvalor(es)? (de|do|da)|parcel|condição especial|sorteio|'
+                    r'black friday|outubro rosa|dia das mães|\blive\b|garantid', re.I)
 IGNORAR = re.compile(r'mesári', re.I)
 
 def achar(pasta, sufixo):

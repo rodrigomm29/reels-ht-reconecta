@@ -73,13 +73,17 @@ FONTE_NATIVA = valor('FONTE_NATIVA', os.path.join(FONTES_DIR, 'Inter-SemiBold.ot
 FONTE_LEGENDA = valor('FONTE_LEGENDA', os.path.join(FONTES_DIR, 'Inter-Bold.otf'))
 
 # ---- contas e conteúdo
-IG_PERFIL = valor('IG_PERFIL', 'anadareconecta')
+IG_PERFIL = valor('IG_PERFIL', 'drafernanda.porto')
 NAVEGADOR = valor('NAVEGADOR', 'chrome')
 CONTA_INSTAGRAM = valor('CONTA_INSTAGRAM', '@' + IG_PERFIL)
 CONTA_TIKTOK = valor('CONTA_TIKTOK', '@' + IG_PERFIL)
-HASHTAGS = valor('HASHTAGS', '#gestaodeclinica #harmonizacaofacial #secretariadeclinica #captacaodepacientes')
+HASHTAGS = valor('HASHTAGS', '#rejuvenescimentofacial #harmonizacaofacial #ultherapy #joaopessoa')
 FUSO = valor('FUSO', 'America/Sao_Paulo')
 DIVIDIDA_Y_PADRAO = int(valor('DIVIDIDA_Y_PADRAO', '300'))
+# faixa onde fica a legenda queimada dos Reels originais (1080×1920), lida pelo OCR do blocos_legenda.py
+LEGENDA_FAIXA_Y = int(valor('LEGENDA_FAIXA_Y', '1200'))
+LEGENDA_FAIXA_H = int(valor('LEGENDA_FAIXA_H', '440'))
+LEGENDA_MIN_TEXTO = int(valor('LEGENDA_MIN_TEXTO', '240'))   # pixels brancos mínimos pra contar como legenda
 
 # ---- segredos: variável de ambiente primeiro; no Mac, cai pro Keychain (nunca impressos)
 KEYCHAIN_PUBLER = valor('KEYCHAIN_PUBLER', 'reconecta-publer')

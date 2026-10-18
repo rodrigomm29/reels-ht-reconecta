@@ -12,6 +12,12 @@ número/nome) e mova pra "excluir" (com o motivo) o que não pode aparecer. Regr
   - nada de pessoa falando pra câmera (lê como depoimento falso);
   - nada com texto grande queimado (briga com a legenda e a headline);
   - nada parado demais.
+Dra. Fernanda (18/10/2026): o tom é clínica premium e naturalidade, então o melhor B-roll é o dela mesma
+(clínica, aparelho, pele em close, bastidor). Exclua também:
+  - meme, celebridade ou clipe de humor (briga com o tom);
+  - agulha, sangue ou procedimento em close que assuste;
+  - paciente identificável sem autorização de imagem;
+  - antes/depois que não seja da própria Fernanda.
 Na dúvida, exclua. Rodar de novo preserva o que já foi excluído e só acrescenta clipes novos.
 """
 import json, os, subprocess, sys

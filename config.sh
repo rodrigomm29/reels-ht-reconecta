@@ -3,7 +3,7 @@
 PROJETO="${0:A:h}"
 [[ -f "$PROJETO/config.env" ]] && { set -a; source "$PROJETO/config.env"; set +a; }
 : "${REELS_BASE:=$PROJETO/dados}"
-: "${IG_PERFIL:=anadareconecta}"
+: "${IG_PERFIL:=drafernanda.porto}"
 : "${NAVEGADOR:=chrome}"
 : "${KEYCHAIN_ELEVENLABS:=elevenlabs-api-key}"
 REELS_BASE="${~REELS_BASE}"

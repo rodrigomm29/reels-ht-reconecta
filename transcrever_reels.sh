@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Transcreve os Reels baixados com ElevenLabs Scribe v2 e monta o corpus de fala da Ana.
+# Transcreve os Reels baixados com ElevenLabs Scribe v2 e monta o corpus de fala.
 # Reaproveita o transcrever_scribe.sh (chave do Keychain, nunca impressa) e o banco de grafias da VSL.
 # Pode rodar de novo: pula o que já foi transcrito.
 # uso: zsh transcrever_reels.sh
@@ -22,7 +22,11 @@ for video in "${videos[@]}"; do
   # áudio mono 16 kHz: o Scribe não precisa de mais que isso e o upload fica leve
   ffmpeg -nostdin -loglevel error -y -i "$video" -vn -ac 1 -ar 16000 "$base/audio/$nome.wav" || { echo "ffmpeg falhou: $nome"; continue; }
   echo "== $nome"
-  zsh "$pipeline/transcrever_scribe.sh" "$base/audio/$nome.wav" "$saida"   # vocab.txt (local) ou vocab.exemplo.txt
+  if [[ "${TRANSCRICAO:-scribe}" == local ]]; then   # Whisper no próprio Mac, grátis (TRANSCRICAO=local no config.env)
+    uv run --quiet --python 3.12 --with mlx-whisper "$pipeline/transcrever_local.py" "$base/audio/$nome.wav" "$saida" 2>&1 | grep -v Warning
+  else
+    zsh "$pipeline/transcrever_scribe.sh" "$base/audio/$nome.wav" "$saida"   # vocab.txt (local) ou vocab.exemplo.txt
+  fi
   grep -q '"text"' "$saida" && (( feitos++ ))
   sleep 1
 done

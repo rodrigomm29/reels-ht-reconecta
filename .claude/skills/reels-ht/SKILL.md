@@ -15,6 +15,12 @@ O passo a passo com os comandos está no `README.md` (seção 5). Esta skill gua
   - o estilo;
   - o horário de início.
 
+## Perfil atual: Dra. Fernanda Porto
+- O público são pacientes (mulheres de 35 a 65 anos), não profissionais.
+- Estilo padrão: `clean`. Os Reels dela já são editados.
+- Render: `--versao ORG AD`. O AD vai para o Gerenciador de Anúncios à mão.
+- Nada de preço, promoção ou promessa de resultado em gancho, título ou legenda.
+
 ## Escolha dos Reels base
 - Fora:
   - lançamento pago (Desafio SUPERCASO etc.);
