@@ -90,6 +90,8 @@ LEGENDA_MIN_TEXTO = int(valor('LEGENDA_MIN_TEXTO', '240'))   # pixels brancos m�
 TITULO_CY = int(valor('TITULO_CY', '1130'))
 # vídeos brutos (editar_bruto.py): velocidade da fala, legenda "palavra" (uma a uma) ou "frase", título "caixa" ou "texto"
 VELOCIDADE_FALA = float(valor('VELOCIDADE_FALA', '1.0'))
+# Reels publicados antes desta data não voltam como Reel base (AAAA-MM-DD; vazio = sem corte)
+DATA_CORTE = valor('DATA_CORTE', '')
 LEGENDA_MODO = valor('LEGENDA_MODO', 'palavra')
 TITULO_MODO = valor('TITULO_MODO', 'caixa')   # centro vertical da caixa de título (pele texto) em 1080×1920
 

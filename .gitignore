@@ -16,6 +16,7 @@ planos/*
 !planos/_instrucoes_bruto.md
 !planos/_estilos_broll.md
 !planos/_fotos.json
+!planos/_excluidos.json
 !planos/exemplo/
 
 # gerados

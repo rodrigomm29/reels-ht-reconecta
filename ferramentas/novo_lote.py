@@ -64,6 +64,15 @@ def main():
     saida = os.path.join(config.PROJETO, 'planos', f'_{a.semana.lower()}_reels.json')
     lote = json.load(open(saida, encoding='utf-8')) if os.path.exists(saida) else {}
     itens = []
+    excl_arq = os.path.join(config.PROJETO, 'planos', '_excluidos.json')
+    excluidos = json.load(open(excl_arq, encoding='utf-8')) if os.path.exists(excl_arq) else {}
+    for sc in a.shortcodes:                       # decisão da equipe: estes não voltam
+        base = sc[:-1] if sc.endswith('F') and sc[:-1] in excluidos else sc
+        if base in excluidos and base != '_sobre':
+            raise SystemExit(f'{sc}: está em planos/_excluidos.json ({excluidos[base]})')
+        arq = achar(videos, f'_{sc}.mp4')
+        if arq and config.DATA_CORTE and not sc.startswith('BR') and arq[:10] < config.DATA_CORTE:
+            raise SystemExit(f'{sc}: publicado em {arq[:10]}, antes da DATA_CORTE {config.DATA_CORTE}')
     for n, sc in enumerate(a.shortcodes):
         arq, tr = achar(videos, f'_{sc}.mp4'), achar(transcr, f'_{sc}.json')
         if not arq:
