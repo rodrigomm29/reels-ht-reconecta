@@ -333,8 +333,10 @@ def main():
         if n in congelar:                              # imagem para no último quadro de frente
             c = congelar[n]
             congela = f",trim=end={c:.3f},tpad=stop_mode=clone:stop_duration={d - c + 0.05:.3f},trim=end={d:.3f}"
+        # tpad + trim: cada trecho sai com EXATAMENTE vq[n] quadros (o fps às vezes entrega 1 a menos, e a
+        # diferença empurrava as emendas seguintes em 1 quadro: 1 quadro em tela cheia antes da foto, 19/10)
         f.append(f"[{n}:v]fps={FPS}{quadro}{congela},setsar=1,setpts=(PTS-STARTPTS)/{V},fps={FPS},"
-                 f"trim=end_frame={vq[n]},setpts=PTS-STARTPTS[v{n}]")
+                 f"tpad=stop_mode=clone:stop_duration=0.2,trim=end_frame={vq[n]},setpts=PTS-STARTPTS[v{n}]")
         f.append(f"[{n}:a]atrim=start={a - va:.4f},aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:d={FADE_AUDIO},"
                  f"afade=t=out:st={d - FADE_AUDIO:.3f}:d={FADE_AUDIO},atempo={V},"
                  f"atrim=end={quadros[n] / FPS:.4f},apad=whole_dur={quadros[n] / FPS:.4f}[a{n}]")
@@ -387,14 +389,16 @@ def main():
         if modo == 'dividida':
             png_metade(os.path.join(config.PROJETO, img['arquivo']), png)
             y_ela = int(ed.get('dividida_y', 300))
-            janela = f"between(t,{t0:.3f},{t0 + dur:.3f})"
+            # meio quadro de folga: o quadro da emenda tem pts 25,19999… e a foto em 25,2 o deixava de fora (19/10)
+            meio = 0.5 / FPS
+            janela = f"between(t,{t0 - meio:.4f},{t0 + dur - meio:.4f})"
             # as duas metades ligam e desligam pela MESMA janela de tempo (antes a foto saía pelo fim da
             # entrada e a janela de baixo pelo enable: 1 quadro com o rosto dela duas vezes, 19/10)
             entradas += ['-loop', '1', '-framerate', str(FPS), '-t', f'{dur + 0.5:.3f}', '-i', png]
             f.append(f"[{ultimo}]split[sa{k}][sb{k}]")
             f.append(f"[sb{k}]crop=1080:964:0:{y_ela}[ela{k}]")
             f.append(f"[sa{k}][ela{k}]overlay=0:956:enable='{janela}'[dv{k}]")
-            f.append(f"[{i}:v]format=rgba,setpts=PTS-STARTPTS+{t0:.3f}/TB[im{k}]")
+            f.append(f"[{i}:v]format=rgba,setpts=PTS-STARTPTS+{t0 - meio:.4f}/TB[im{k}]")
             f.append(f"[dv{k}][im{k}]overlay=0:0:enable='{janela}':eof_action=pass:format=auto[ov{k}]")
         else:
             png_imagem(os.path.join(config.PROJETO, img['arquivo']), png)
@@ -434,6 +438,9 @@ def main():
                'origem': f'remapeada de {info["video"]} por editar_bruto.py'},
               open(saida.replace('/videos/', '/transcricoes/').replace('.mp4', '.json'), 'w', encoding='utf-8'),
               ensure_ascii=False)
+    # emendas da IMAGEM (s, tempo da saída): o plano dos ganchos usa para nenhum gancho atravessar um corte
+    json.dump({'emendas': [round(e, 4) for e in emendas]},
+              open(saida.replace('/videos/', '/brutos/').replace('.mp4', '_emendas.json'), 'w', encoding='utf-8'))
     final = os.path.join(config.SAIDA_DIR, 'brutos', vid, 'sem gancho', f'{vid} sem gancho.mp4')
     os.makedirs(os.path.dirname(final), exist_ok=True)
     shutil.copyfile(saida, final)

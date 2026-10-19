@@ -122,6 +122,17 @@ def main():
             for k in ('fim_video', 'ini_corte_min', 'titulo_cy'):
                 if h.get(k) is not None:
                     hk[k] = h[k]
+            # vídeo bruto editado: o gancho não atravessa uma emenda (a folga depois da última palavra entrava
+            # 3 quadros no trecho seguinte, 19/10). Imagem para na emenda; o áudio da folga segue.
+            emj = os.path.join(BASE, 'brutos', arq.replace('.mp4', '_emendas.json'))
+            if os.path.exists(emj):
+                ems = json.load(open(emj, encoding='utf-8'))['emendas']
+                depois = [e for e in ems if h['fim'] - 0.02 <= e <= h['fim'] + 0.5]
+                antes = [e for e in ems if h['inicio'] - 0.5 <= e <= h['inicio'] + 0.02]
+                if depois:
+                    hk['fim_video'] = round(min(depois[0] - 0.034, hk.get('fim_video', 99)), 3)
+                if antes:
+                    hk['ini_corte_min'] = round(max(antes[-1] + 0.001, hk.get('ini_corte_min', 0)), 3)
             hooks[l] = hk
         momentos = []
         for m in d.get('momentos') or []:
