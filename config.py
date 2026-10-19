@@ -81,9 +81,10 @@ HASHTAGS = valor('HASHTAGS', '#rejuvenescimentofacial #harmonizacaofacial #ulthe
 FUSO = valor('FUSO', 'America/Sao_Paulo')
 DIVIDIDA_Y_PADRAO = int(valor('DIVIDIDA_Y_PADRAO', '300'))
 # faixa onde fica a legenda queimada dos Reels originais (1080×1920), lida pelo OCR do blocos_legenda.py
-LEGENDA_FAIXA_Y = int(valor('LEGENDA_FAIXA_Y', '1200'))
+LEGENDA_FAIXA_Y = valor('LEGENDA_FAIXA_Y', '1200')          # número ou "auto" (medida por vídeo)
 LEGENDA_FAIXA_H = int(valor('LEGENDA_FAIXA_H', '440'))
 LEGENDA_MIN_TEXTO = int(valor('LEGENDA_MIN_TEXTO', '240'))   # pixels brancos mínimos pra contar como legenda
+TITULO_CY = int(valor('TITULO_CY', '1130'))   # centro vertical da caixa de título (pele texto) em 1080×1920
 
 # ---- segredos: variável de ambiente primeiro; no Mac, cai pro Keychain (nunca impressos)
 KEYCHAIN_PUBLER = valor('KEYCHAIN_PUBLER', 'reconecta-publer')

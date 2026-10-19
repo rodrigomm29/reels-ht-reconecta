@@ -49,7 +49,7 @@ ZOOM_MIN = 3.0                     # s mínimos em cada enquadramento
 PELES_LIMPAS = ('limpa', 'zoom', 'texto')
 ZOOM_LIMPO = 1.10
 FONTE_NATIVA = config.FONTE_NATIVA
-TEXTO_NATIVO_CY = 1130
+TEXTO_NATIVO_CY = config.TITULO_CY       # centro da caixa de título da pele "texto" (config.env)
 # tela dividida (13/10): B-roll em cima, a Ana embaixo, legenda nossa logo acima da emenda, headline 4 s no topo
 EMENDA = 956                       # altura da metade de cima (o acervo normalizado é 1080×956)
 ANA_H = 1920 - EMENDA              # 964: janela da Ana recortada do Reel (y do topo vem do plano: `dividida_y`)
@@ -57,6 +57,7 @@ HEADLINE_DUR = 4.0
 HEADLINE_CY = 250                  # centro da headline no alto da metade de cima
 FONTE_LEGENDA = config.FONTE_LEGENDA
 LEGENDA_H = 220                    # altura da faixa da legenda (a base do texto fica ~22 px acima da emenda)
+FOTO_ABERTURA = 2.4               # s do antes/depois que abre a metade de cima (REGRA: foto ≤ 2,5 s na tela)
 BROLL_MIN, BROLL_MAX = 2.4, 4.2    # s de cada clipe em cima (média ~3,3 s; referência medida 2,2–3,4 s)
 CARTAO = (108, 384, 864, 1536)     # manchete: x, y, largura, altura do vídeo (0,8×)
 LUT_FORCA = 0.6                    # cinema: 60 % LUT + 40 % original (pele não fica laranja)
@@ -138,15 +139,16 @@ def png_pergunta(titulo, saida):
     texto_com_sombra(img, linhas, f, 540, y0, 1.1, CREME, sombra=0.7, raio=14)
     img.save(saida)
 
-def png_texto_nativo(titulo, saida):
+def png_texto_nativo(titulo, saida, cy=None):
     """Caixa branca arredondada com texto preto centralizado, no jeito do texto "Clássico com fundo" do Instagram."""
     img = Image.new('RGBA', (1080, 1920), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     f, linhas = ajustar(titulo, FONTE_NATIVA, 58, 44, 820, 3)
     alt = int(f.size * 1.28)
     larg = max(int(d.textlength(l, font=f)) for l in linhas)
-    # centro em y≈1130 (entre o queixo e a legenda queimada): no topo muitos Reels da Ana já têm título/print próprio
-    y0 = int(TEXTO_NATIVO_CY - alt * len(linhas) / 2)
+    # centro em TITULO_CY: Ana 1130 (entre o queixo e a legenda queimada; no topo muitos Reels dela já têm título/print);
+    # Fernanda 1470 (a legenda dela fica em 1160–1290, e em cima a caixa bate na testa e na interface do Instagram)
+    y0 = int((cy or TEXTO_NATIVO_CY) - alt * len(linhas) / 2)
     for i, l in enumerate(linhas):               # uma pílula por linha, como o Instagram faz
         w = int(d.textlength(l, font=f))
         x0 = 540 - w // 2
@@ -243,6 +245,24 @@ def faixa_broll(cfg, v, hk, rotulo, total, fps, pasta):
         raise SystemExit(f'{rotulo}: gancho sem lista de broll (montar o plano com montar_plano_dia.py --estilo dividida)')
     base = cfg['broll_pasta']
     pedacos, t, n = [], 0.0, 0
+    if hk.get('abertura_foto'):                    # antes/depois em cima nos primeiros FOTO_ABERTURA s
+        png = os.path.join(pasta, 'abertura.png')
+        im = Image.open(hk['abertura_foto']).convert('RGB')
+        fundo = im.resize((1080, int(im.height * 1080 / im.width)), Image.LANCZOS)
+        y = max(0, (fundo.height - EMENDA) // 2)
+        fundo = fundo.crop((0, y, 1080, y + EMENDA)).resize((1080, EMENDA)).filter(ImageFilter.GaussianBlur(30))
+        # a headline (4 s, centro em HEADLINE_CY) fica em cima: a foto vai inteira no espaço de baixo dela
+        topo = HEADLINE_CY + 110
+        esc = min(1000 / im.width, (EMENDA - topo - 20) / im.height)
+        frente = im.resize((int(im.width * esc), int(im.height * esc)), Image.LANCZOS)
+        fundo.paste(frente, ((1080 - frente.width) // 2, topo + (EMENDA - topo - 20 - frente.height) // 2))
+        fundo.save(png)
+        p = os.path.join(pasta, 'b_foto.mp4')
+        ff(['-loop', '1', '-framerate', str(fps), '-t', f'{FOTO_ABERTURA:.3f}', '-i', png,
+            '-vf', f'fps={fps},scale=1080:{EMENDA},setsar=1,format=yuv420p',
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '12', p])
+        pedacos.append(p)
+        t += duracao(p)
     while t < total + 0.5:
         if n and n % len(lista) == 0:              # acabou a lista: reembaralha (só em vídeo muito longo)
             rnd.shuffle(lista)
@@ -512,7 +532,7 @@ def render(cfg, v, hk, var, pals, saida, tmp, kit, ate=None, trecho=None, preset
             sfx.append(('obturador', h))
     elif pele == 'texto':                           # caixa de texto nativa só durante o gancho
         pt = os.path.join(tmp, 'texto_nativo.png')
-        png_texto_nativo(hk['titulo'], pt)
+        png_texto_nativo(hk['titulo'], pt, hk.get('titulo_cy'))     # titulo_cy: por gancho, quando a imagem pede
         i_t = entrada('-loop', '1', '-framerate', str(fps), '-t', f"{h:.3f}", '-i', pt)
         f.append(f"[{i_t}:v]format=rgba[tn]")
         f.append(f"[cv][tn]overlay=0:0:eof_action=pass:format=auto,format=yuv420p[pv]")

@@ -227,10 +227,15 @@ Abra as tiras em `$SAIDA_DIR/SEM43/segunda/_conferencia/`: 5 quadros por vídeo.
 O relatório `_relatorio_*.json` aponta alertas como "ABRE NO PRETO" e "PASSOU DO LIMITE".
 
 ### 5.8 Organizar, montar a fila e agendar
+- **Aprovação:** o `pasta_aprovacao.py` monta `saida/SEM43/aprovar/`, uma pasta por dia com os vídeos no horário em que vão ao ar, a legenda, a tira de quadros e o checklist `_aprovar.md`. Use a mesma grade (`--inicio`, `--por-dia`, `--intervalo`) do agendamento.
+- **Fernanda:** 1 Reel por dia nas 3 versões (`--por-dia 3 --intervalo 180`, a partir das 12:00), na ordem por Reel, sem o `intercalar`.
 ```bash
 python3 organizar_organico.py planos/ht_sem43_segunda.json
 cd publicar
 python3 fila.py montar ../planos/ht_sem43_segunda.json
+cd ..
+python3 ferramentas/pasta_aprovacao.py SEM43-segunda-ht --inicio "2026-10-19 12:00" --por-dia 3 --intervalo 180
+cd publicar
 python3 fila.py intercalar SEM43-segunda-ht        # todos os A, depois os B, depois os C
 python3 publer_postar.py postar SEM43-segunda-ht --rede instagram --inicio "2026-10-19 19:00" \
     --intervalo 2 --por-dia 21 --simular            # confere horários, contas e legendas
@@ -253,7 +258,7 @@ python3 ferramentas/novo_lote.py --semana SEM43 --dia terça --primeiro 8 BR001E
 ```
 A partir daí, siga a rotina normal (5.3 em diante) com o id `BR001E` para as 3 versões com gancho.
 - **Edição:** emendas com 0,30 s de pausa (o ritmo natural dela), enquadramento alternado (normal e 1,1×) a cada trecho e legenda palavra por palavra no terço de baixo.
-- **Antes e depois:** no máximo **2,5 s** na tela por aparição, travado no script, porque o Meta barra acima de 3 s.
+- **Antes e depois:** sem limite no orgânico. Em vídeo para anúncio (`"para_anuncio": true` no `_edicao.json`), no máximo **2,5 s** por aparição, travado no script, porque o Meta barra acima de 3 s.
 - **Ganchos:** os agentes não usam o `blocos_legenda.py` nesses vídeos (a legenda é nossa, sincronizada com a fala) e cortam pela fronteira das palavras.
 
 ---

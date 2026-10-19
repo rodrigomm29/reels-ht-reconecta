@@ -3,13 +3,15 @@
 
 Cada subpasta de `brutos/entrada/` é UM vídeo final:
   - os vídeos (.mov/.mp4) são os takes da fala, juntados na ordem em que foram gravados;
-  - as imagens (.jpg/.png/.heic) são material de apoio (ex.: antes/depois), que o editar_bruto.py põe na tela.
+  - as imagens (.jpg/.png/.heic) são material de apoio (ex.: antes/depois), que o editar_bruto.py põe na tela;
+  - a subpasta `cenas/` (opcional) tem os cortes de atendimento/procedimento, que entram por cima da fala.
 
 Para cada pasta nova, este script:
   1. normaliza cada take para 1080×1920, 30 fps constantes, H.264 + AAC 48 kHz (celular grava HEVC, 720p,
      às vezes com fps variável, e o render do projeto supõe 1080×1920 CFR);
   2. junta os takes em `dados/videos/<data>_BRnnn.mp4` (o id BRnnn faz o papel do shortcode nos outros scripts);
-  3. grava `dados/brutos/BRnnn.json` com a origem, o início de cada take no vídeo juntado e as imagens;
+  3. grava `dados/brutos/BRnnn.json` com a origem, o início de cada take no vídeo juntado, as imagens e as cenas
+     (cada cena normalizada em `dados/brutos/BRnnn_cenas/`, sem áudio);
   4. transcreve com o transcrever_reels.sh (só o que ainda não tem transcrição).
 Os originais nunca são alterados. Pasta já importada é pulada (o registro fica em dados/brutos/_importados.json).
 
@@ -50,13 +52,14 @@ def duracao(arq):
     return float(sonda(arq, ['-show_entries', 'format=duration'])['format']['duration'])
 
 
-def normalizar(origem, destino):
+def normalizar(origem, destino, audio=True):
     """1080×1920 30 fps CFR. Deitado ou fora de 9:16 é recortado no centro (sem esticar)."""
     vf = ('scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,'
           'fps=30,setsar=1,format=yuv420p')
     subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', origem, '-vf', vf,
-                    '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-c:a', 'aac', '-b:a', '192k',
-                    '-ar', '48000', '-ac', '2', '-movflags', '+faststart', destino], check=True)
+                    '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
+                    *(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2'] if audio else ['-an']),
+                    '-movflags', '+faststart', destino], check=True)
 
 
 def proximo_id(registro):
@@ -72,6 +75,9 @@ def importar(pasta, registro):
     if not takes:
         print(f'{nome}: nenhum vídeo, pulando')
         return
+    pasta_cenas = os.path.join(pasta, 'cenas')
+    cenas_orig = sorted(os.path.join(pasta_cenas, f) for f in os.listdir(pasta_cenas)
+                        if f.lower().endswith(EXT_VIDEO) and not f.startswith('.')) if os.path.isdir(pasta_cenas) else []
     takes.sort(key=gravado_em)
     vid = proximo_id(registro)
     data = gravado_em(takes[0]).astimezone().strftime('%Y-%m-%d')
@@ -94,11 +100,23 @@ def importar(pasta, registro):
     for p in partes + [lista]:
         os.remove(p)
     os.rmdir(tmp)
+    cenas = []
+    if cenas_orig:
+        destino_cenas = os.path.join(REG_DIR, f'{vid}_cenas')
+        os.makedirs(destino_cenas, exist_ok=True)
+        for c in cenas_orig:
+            normal = os.path.join(destino_cenas, os.path.splitext(os.path.basename(c))[0] + '.mp4')
+            print(f'  {vid} cena: {os.path.basename(c)}')
+            normalizar(c, normal, audio=False)
+            cenas.append({'arquivo': os.path.relpath(normal, config.PROJETO), 'duracao': round(duracao(normal), 2),
+                          'origem': os.path.basename(c)})
     info = {'id': vid, 'pasta': os.path.relpath(pasta, config.PROJETO), 'video': os.path.basename(saida),
-            'duracao': round(duracao(saida), 2), 'takes': inicios, 'imagens': imagens}
+            'duracao': round(duracao(saida), 2), 'takes': inicios,
+            'imagens': [os.path.relpath(i, config.PROJETO) for i in imagens], 'cenas': cenas}
     json.dump(info, open(os.path.join(REG_DIR, f'{vid}.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     registro[nome] = {'id': vid, 'video': info['video']}
-    print(f'{nome} → {vid}: {len(takes)} takes, {info["duracao"]:.1f} s, {len(imagens)} imagem(ns) → {saida}')
+    print(f'{nome} → {vid}: {len(takes)} takes, {info["duracao"]:.1f} s, {len(imagens)} imagem(ns), '
+          f'{len(cenas)} cena(s) → {saida}')
 
 
 def main():

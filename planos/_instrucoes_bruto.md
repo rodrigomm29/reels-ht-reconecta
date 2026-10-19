@@ -4,9 +4,12 @@ Você monta a edição de um vídeo BRUTO, ainda não postado: escolhe o que fic
 
 O público e o tom são os mesmos dos ganchos: leia a seção "Para quem é o vídeo" de `planos/_instrucoes_ganchos.md`.
 
+## REGRA DE ANÚNCIO: foto de antes, de depois ou de antes/depois
+Em vídeo que vai para ANÚNCIO (Meta Ads), nenhuma foto de antes, de depois ou de antes/depois pode ficar MAIS DE 2,5 s na tela, em tela cheia, em janela ou em tela dividida (o Meta barra acima de 3 s). No ORGÂNICO (Trial Reels e posts) não há esse limite: a foto fica o tempo que a edição pedir.
+
 ## O seu item
 O `ferramentas/importar_brutos.py` já juntou os takes e transcreveu. Você recebe o id (ex.: `BR001`):
-- `dados/brutos/<ID>.json`: o vídeo juntado (`video`), o início de cada take no vídeo juntado (`takes`) e as imagens de apoio (`imagens`).
+- `dados/brutos/<ID>.json`: o vídeo juntado (`video`), o início de cada take no vídeo juntado (`takes`), as imagens de apoio (`imagens`) e as cenas de atendimento (`cenas`, já normalizadas, sem áudio, com a duração de cada uma).
 - Vídeo: `dados/videos/<video>`.
 - Transcrição Scribe: `dados/transcricoes/<mesmo nome>.json` (campo `words`: text/start/end/type).
 
@@ -29,18 +32,30 @@ O bruto vem de duas formas:
 4. **Imagem de apoio** (antes e depois etc.), se houver em `imagens`:
    - Ponha onde a fala aponta para ela ("olha esse resultado", "aqui", "essa paciente").
    - `em` = um pouco depois da palavra que aponta, no tempo do BRUTO e dentro de um trecho mantido.
-   - `dur` no máximo 2,5 s (regra do Meta: antes e depois não pode passar de 3 s na tela; o script também trava em 2,5).
+   - `dur`: no orgânico, o tempo que a fala pede (em geral 2 a 4 s). Se o vídeo também vai virar anúncio, ponha `"para_anuncio": true` no JSON: aí cada foto fica no máximo 2,5 s (o script trava).
    - Pode aparecer mais de uma vez, mas com pelo menos 10 s entre as aparições e no máximo 2 vezes por vídeo.
+   - `modo`: `"dividida"` (preferido pela Fernanda: a tela divide SÓ enquanto a foto aparece, foto em cima e ela embaixo, depois volta para ela em tela cheia) ou `"tela_cheia"`. Na dividida, meça a janela do rosto com `python3 ferramentas/medir_janela.py <ID>` (folha com régua) e grave `"dividida_y"` no JSON: o topo da cabeça logo abaixo da borda de cima, rosto e peito dentro dos 964 px.
+   - Só use foto do CASO de que ela está falando (a imagem que veio na pasta). Nunca foto ou cena aleatória.
    - Sem lugar natural na fala: use uma vez, no trecho de prova/resultado, e explique em `obs`.
-5. Confira a duração final (soma dos trechos + ~0,6 s por trecho). Alvo: até 90 s. Se passar, aponte em `obs` o que poderia sair.
-6. Último trecho com CTA de anúncio ("clique e agende"): mantenha e marque `"cta_final": true`. Os ganchos não usam esse trecho.
+5. **Cenas de atendimento**, se houver em `cenas`: elas entram em tela cheia, por cima da fala (a voz dela continua e a legenda também).
+   - Antes de escolher, olhe cada cena: tire 2 ou 3 quadros com `ffmpeg -ss <t> -i "<cena>" -frames:v 1 -y /tmp/c.jpg`.
+   - Ponha cada cena onde a fala combina com ela: procedimento quando ela fala de tratamento ou técnica, aparelho quando cita a tecnologia, consulta ou avaliação quando fala de planejamento.
+   - `em` no tempo do BRUTO, dentro de um trecho mantido; `dur` entre 1,5 e 4 s (o script trava nisso); `ini` = de onde o clipe começa (0 se for do início).
+   - **Ritmo:** no máximo uma cena a cada ~6 s de vídeo, e nunca duas seguidas sem a Fernanda aparecer entre elas.
+   - **Não cubra:** os primeiros 3 s do vídeo (ela precisa aparecer); frase de identificação forte dita olhando para a câmera ("você", "eu sei que…"); o momento da imagem de antes e depois.
+   - Cada cena no máximo uma vez. Cena que não combina com nada da fala fica de fora: liste em `obs`.
+   - Cena com rosto de paciente reconhecível: só use se veio na pasta (a Fernanda já tem a autorização).
+6. Confira a duração final (soma dos trechos + ~0,6 s por trecho). Alvo: até 90 s. Se passar, aponte em `obs` o que poderia sair.
+7. Último trecho com CTA de anúncio ("clique e agende"): mantenha e marque `"cta_final": true`. Os ganchos não usam esse trecho.
 
 ## Saída
 Grave em `dados/brutos/<ID>_edicao.json`, exatamente:
 ```json
 {"id":"BR00X",
  "manter":[[0.0,0.0,"texto literal do trecho"]],
- "imagens":[{"arquivo":"brutos/entrada/<pasta>/<imagem>","em":0.0,"dur":2.5,"_porque":"palavra que aponta"}],
+ "dividida_y":400,
+ "imagens":[{"arquivo":"brutos/entrada/<pasta>/<imagem>","em":0.0,"dur":2.5,"modo":"dividida","_porque":"palavra que aponta"}],
+ "cenas":[{"arquivo":"dados/brutos/<ID>_cenas/<cena>.mp4","em":0.0,"dur":3.0,"ini":0.0,"_porque":"fala que combina"}],
  "cta_final":false,
  "sai":[[0.0,0.0,"o que saiu e por quê"]],
  "obs":"..."}

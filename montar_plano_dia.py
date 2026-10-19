@@ -61,6 +61,8 @@ def main():
                          'pessoa embaixo, legenda na emenda, headline 4 s')
     ap.add_argument('--dividida-y', help='dividida: JSON {shortcode: {"y": topo da janela da pessoa}}')
     ap.add_argument('--broll-triagem', help='dividida: JSON da triagem ({"pasta", "ok": [...]}) do B-roll')
+    ap.add_argument('--abertura-fotos', help='dividida: pasta de antes/depois (.jpg/.png); cada gancho abre com '
+                                             'um deles em cima por 2,4 s, A/B/C sempre com fotos diferentes')
     a = ap.parse_args()
     a.modelo = a.modelo or os.path.join(config.PROJETO, 'planos', 'modelo_organico.json')
     modelo = json.load(open(a.modelo, encoding='utf-8'))
@@ -117,7 +119,7 @@ def main():
                   'pele': pele, 'abertura': abertura}
             if a.estilo == 'dividida':
                 hk['headline'] = h['titulo']
-            for k in ('fim_video', 'ini_corte_min'):
+            for k in ('fim_video', 'ini_corte_min', 'titulo_cy'):
                 if h.get(k) is not None:
                     hk[k] = h[k]
             hooks[l] = hk
@@ -145,6 +147,14 @@ def main():
         videos.append(item)
     if a.estilo == 'dividida':
         distribuir_broll(videos, triagem['ok'], f"{semana}-{a.dia}")
+        if a.abertura_fotos:
+            fotos = sorted(os.path.join(a.abertura_fotos, f) for f in os.listdir(a.abertura_fotos)
+                           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('.'))
+            n = 0
+            for v in videos:
+                for letra in sorted(v['hooks']):
+                    v['hooks'][letra]['abertura_foto'] = fotos[n % len(fotos)]
+                    n += 1
     destino = unicodedata.normalize('NFC', modelo['destino'].rsplit('/', 1)[0] + '/' + a.dia)
     plano = {'_sobre': f'HT {semana} {a.dia.upper()}: {len(videos)} Reels base × 3 ganchos × anúncio + orgânico; '
                        'peles e aberturas em rodízio; montado por montar_plano_dia.py',

@@ -14,6 +14,9 @@ Você escolhe ganchos de vídeo a partir de um Reel da Dra. Fernanda Porto (@dra
   - "Derretimento facial? Sei que incomoda você aí também" e a história da Evelyn;
   - "Seu rosto muda aos poucos. E, muitas vezes, você nem percebe": 11 mil views.
 
+## REGRA DE ANÚNCIO: foto de antes, de depois ou de antes/depois
+Em vídeo que vai para ANÚNCIO (Meta Ads), nenhuma foto de antes, de depois ou de antes/depois pode ficar MAIS DE 2,5 s na tela, em tela cheia, em janela ou em tela dividida (o Meta barra acima de 3 s). No ORGÂNICO (Trial Reels e posts) não há esse limite: a foto fica o tempo que a edição pedir.
+
 ## Formato dos Reels dela
 São Reels editados: a Fernanda fala para a câmera, intercalada com cenas da clínica e do procedimento, com pacientes e depoimentos. A legenda queimada costuma ser pequena e ficar no meio da tela. Alguns Reels quase não têm fala; esses não servem de base.
 
@@ -50,7 +53,8 @@ Quantos ganchos: 3 (A, B, C). Eles viram 3 vídeos que precisam parecer DIFERENT
       - Nada de comparação com outra profissional ou clínica, nem "a melhor".
       - Nada que exponha a paciente de forma negativa ("ela estava horrível").
       - Nada de live, evento com data, datas, "link na bio", política ou regras de conselho.
-   f) De preferência, um momento com prova visual: o resultado aparece, a paciente reage, o aparelho está em uso. Para conferir, tire um quadro com
+   f) **Foto de antes/depois (só importa para anúncio):** rode `python3 ferramentas/checar_fotos.py "<vídeo>"` (lista os trechos de imagem parada). Se o Reel tiver foto parada acima de 2,5 s, avise no começo do `obs` com "FOTO > 2,5 s: não serve para anúncio sem limpar". Para o orgânico, isso não muda a escolha dos ganchos.
+   g) De preferência, um momento com prova visual: o resultado aparece, a paciente reage, o aparelho está em uso. Para conferir, tire um quadro com
       `ffmpeg -ss <t> -i "<vídeo>" -frames:v 1 -y /tmp/q.jpg` e olhe.
 3. **Confira a legenda queimada de cada gancho** (obrigatório):
    `python3 blocos_legenda.py "<vídeo>" "<transcrição>" --de <inicio-1.5> --ate <fim+1.5>`
@@ -66,6 +70,7 @@ Quantos ganchos: 3 (A, B, C). Eles viram 3 vídeos que precisam parecer DIFERENT
    - Sem promessa de resultado.
    - Uma frase como a Fernanda falaria, por exemplo "Seu rosto não está cansado, está sem sustentação".
    - Os 3 títulos diferentes entre si.
+   - **Posição:** a caixa de título fica, por padrão, abaixo da legenda (y≈1470). Se no gancho aparecer foto, antes/depois ou imagem importante na metade de baixo da tela (confira os quadros), ponha `"titulo_cy": 330` no gancho: o título sobe para o alto e não cobre a imagem.
 6. **Se `dur` > 175 s,** liste também `cortes_versao_curta`: frases inteiras de desvio que podem sair sem quebrar o argumento.
    - As bordas ficam no silêncio e entre blocos de legenda, conferidas no `blocos_legenda.py`.
    - Ordene do mais dispensável para o menos, somando pelo menos `dur + 8 − 193` s.
@@ -82,7 +87,7 @@ Quantos ganchos: 3 (A, B, C). Eles viram 3 vídeos que precisam parecer DIFERENT
 Grave no caminho indicado no seu pedido, exatamente:
 ```json
 {"vd":"VD00X","shortcode":"...","duracao":0.0,
- "hooks":{"A":{"inicio":0.0,"fim":0.0,"texto":"literal","angulo":"dor","titulo":"...","fim_video":null,"ini_corte_min":null,"obs":""},"B":{},"C":{}},
+ "hooks":{"A":{"inicio":0.0,"fim":0.0,"texto":"literal","angulo":"dor","titulo":"...","titulo_cy":null,"fim_video":null,"ini_corte_min":null,"obs":""},"B":{},"C":{}},
  "momentos":[], "cortes_versao_curta":[], "legendas":{"A":"...","B":"...","C":"..."}, "obs":"..."}
 ```
 Devolva o mesmo JSON como resposta final (só o JSON).

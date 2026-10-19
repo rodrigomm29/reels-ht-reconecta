@@ -13,6 +13,9 @@ import argparse, glob, json, os, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config  # noqa: E402
+from checar_fotos import trechos_parados  # noqa: E402
+
+FOTO_MAX = 2.5        # regra do Meta, só para ANÚNCIO: foto de antes/depois no máximo 2,5 s (no orgânico, só aviso)
 
 
 def achar(pasta, sufixo):
@@ -72,9 +75,17 @@ def main():
                       'legenda': legenda_original(os.path.join(videos, arq + '.json'))})
     lote[a.dia] = itens
     json.dump(lote, open(saida, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    barrados = []
     for i in itens:
+        fotos = [(x, y) for x, y in trechos_parados(os.path.join(videos, i['video'])) if y - x > FOTO_MAX]
         print(f"{i['vd']}  {i['sc']}  {i['dur']:6.1f}s  ganchos já usados: {len(i['evitar'])}"
-              + ('  (passa de 175 s: o agente lista cortes)' if i['dur'] > 175 else ''))
+              + ('  (passa de 175 s: o agente lista cortes)' if i['dur'] > 175 else '')
+              + (f"  (foto parada > {FOTO_MAX} s: não serve para anúncio sem limpar) " + ', '.join(f'{x:.1f}–{y:.1f}' for x, y in fotos) if fotos else ''))
+        if fotos:
+            barrados.append(i['sc'])
+    if barrados:
+        print(f"aviso: {', '.join(barrados)} mostram foto acima de {FOTO_MAX} s. Ok no orgânico; para anúncio, "
+              f"gere a versão limpa com ferramentas/limpar_fotos.py")
     print('gravado:', saida)
 
 

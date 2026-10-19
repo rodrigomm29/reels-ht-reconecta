@@ -32,8 +32,10 @@ from montar_ht_hooks import corte_do_gancho  # noqa: E402
 import config  # noqa: E402
 
 OCR = os.path.join(AQUI, 'bin', 'ocr_legenda')
-FAIXA_Y, FAIXA_H = config.LEGENDA_FAIXA_Y, config.LEGENDA_FAIXA_H   # faixa da legenda em 1080×1920 (config.env)
-W, H = 540, FAIXA_H // 2              # faixa reduzida (1/2): em 1/4 a legenda de letra pequena (DeASuSYATAR) some
+# faixa da legenda em 1080×1920 (config.env). LEGENDA_FAIXA_Y=auto mede por vídeo (faixa_do) e guarda em
+# planos/_legenda_faixa.json: a legenda da Fernanda muda de altura de um Reel pro outro (1130 a 1290).
+FAIXA_Y, FAIXA_H = config.LEGENDA_FAIXA_Y, config.LEGENDA_FAIXA_H
+W = 540                               # faixa reduzida (1/2): em 1/4 a legenda de letra pequena (DeASuSYATAR) some
 FPS = 30
 LIMIAR_BRANCO = 240
 TROCA = 0.35
@@ -41,9 +43,68 @@ MIN_TEXTO = config.LEGENDA_MIN_TEXTO  # pixels de texto na faixa reduzida (Ana: 
 MIN_BLOCO = 0.15
 TETO_INI, TETO_FIM = 0.25, 0.35       # s de bloco errado que o ajuste fino resolve sem trocar o gancho
 
+CACHE_FAIXA = os.path.join(AQUI, 'planos', '_legenda_faixa.json')
+
+
+def medir_faixa(video, amostras=10):
+    """Acha a faixa da legenda queimada lendo FAIXAS horizontais da tela com o OCR (y 760 a 1560, de 80 em 80)
+    em alguns quadros, e fica com a que mais devolve palavras da própria fala (transcrição). Brilho ou
+    movimento enganam (mão, rosto, blusa branca); palavra da fala, não."""
+    dur = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video],
+                               capture_output=True, text=True).stdout)
+    tr = video.replace('/videos/', '/transcricoes/').rsplit('.', 1)[0] + '.json'
+    fala = set(tokens(json.load(open(tr, encoding='utf-8')).get('text', ''))) if os.path.exists(tr) else set()
+    ys = list(range(760, 1561, 80))
+    with tempfile.TemporaryDirectory() as d:
+        pngs = {}
+        for k in range(amostras):
+            t = dur * (k + 0.5) / amostras
+            quadro = os.path.join(d, f'q{k}.png')
+            subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-ss', f'{t:.2f}', '-i', video,
+                            '-frames:v', '1', '-vf', 'scale=1080:1920', quadro], check=True)
+            for y in ys:
+                faixa = os.path.join(d, f'q{k}_{y}.png')
+                subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', quadro,
+                                '-vf', f'crop=1080:160:0:{y}', faixa], check=True)
+                pngs[faixa] = y
+        saida = subprocess.run([OCR, *pngs], capture_output=True, text=True).stdout
+    pontos = {y: 0 for y in ys}
+    for linha in saida.splitlines():
+        if '\t' in linha:
+            caminho, texto = linha.split('\t', 1)
+            pontos[pngs[caminho]] += sum(1 for w in tokens(texto) if len(w) >= 3 and (not fala or w in fala))
+    melhor = max(ys, key=lambda y: pontos[y])
+    if pontos[melhor] < 3:                               # quase nada lido: sem legenda queimada
+        return FAIXA_Y_PADRAO, FAIXA_H_PADRAO
+    # a legenda pode estar entre duas faixas vizinhas: junta a vizinha se ela também leu bem
+    viz = [y for y in (melhor - 80, melhor + 80) if pontos.get(y, 0) >= pontos[melhor] * 0.6]
+    y0, y1 = min([melhor] + viz), max([melhor] + viz) + 160
+    return y0, y1 - y0
+
+
+FAIXA_Y_PADRAO, FAIXA_H_PADRAO = 1200, 440
+_faixas = {}
+
+
+def faixa_do(video):
+    """(y, altura) da faixa da legenda deste vídeo: a do config.env, ou medida (LEGENDA_FAIXA_Y=auto)."""
+    if str(FAIXA_Y).lower() != 'auto':
+        return int(FAIXA_Y), int(FAIXA_H)
+    nome = os.path.basename(video)
+    if nome not in _faixas:
+        cache = json.load(open(CACHE_FAIXA, encoding='utf-8')) if os.path.exists(CACHE_FAIXA) else {}
+        if nome not in cache:
+            cache[nome] = list(medir_faixa(video))
+            json.dump(cache, open(CACHE_FAIXA, 'w', encoding='utf-8'), indent=1)
+        _faixas[nome] = tuple(cache[nome])
+    return _faixas[nome]
+
+
 def mascaras(video, t0, dur):
+    fy, fh = faixa_do(video)
+    H = fh // 2
     cmd = ['ffmpeg', '-nostdin', '-loglevel', 'error', '-ss', f'{t0:.3f}', '-t', f'{dur:.3f}', '-i', video,
-           '-vf', f'fps={FPS},scale=1080:1920,crop=1080:{FAIXA_H}:0:{FAIXA_Y},scale={W}:{H},format=gray',
+           '-vf', f'fps={FPS},scale=1080:1920,crop=1080:{fh}:0:{fy},scale={W}:{H},format=gray',
            '-f', 'rawvideo', '-']
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     n, i = W * H, 0
@@ -81,12 +142,13 @@ def blocos(video, t0, t1):
 
 def ocr(video, tempos):
     """Lê a legenda nos instantes pedidos. Devolve [texto]."""
+    fy, fh = faixa_do(video)
     with tempfile.TemporaryDirectory() as d:
         pngs = []
         for i, t in enumerate(tempos):
             png = os.path.join(d, f'{i}.png')
             subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-ss', f'{t:.3f}', '-i', video,
-                            '-frames:v', '1', '-vf', f'scale=1080:1920,crop=1080:{FAIXA_H}:0:{FAIXA_Y}', png], check=True)
+                            '-frames:v', '1', '-vf', f'scale=1080:1920,crop=1080:{fh}:0:{fy}', png], check=True)
             pngs.append(png)
         if not pngs:
             return []

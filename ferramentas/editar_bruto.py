@@ -5,8 +5,15 @@ no fluxo normal (novo_lote → agentes → plano → render) como se fosse um Re
 Lê `dados/brutos/<ID>_edicao.json`:
   manter   [[início, fim, "texto"], ...]  trechos do bruto que ficam, na ordem (o resto sai: erro, conversa, pausa).
            início = start da 1ª palavra, fim = end da última; a folga de respiração é posta aqui (FOLGA_*).
-  imagens  [{"arquivo", "em", "dur"}]     imagem de apoio (ex.: antes/depois) em tela cheia; "em" no tempo do BRUTO.
-           A duração é limitada a IMAGEM_MAX (2,5 s): o Meta barra antes/depois que fica mais de 3 s na tela.
+  imagens  [{"arquivo", "em", "dur", "modo"}]  imagem de apoio (ex.: antes/depois); "em" no tempo do BRUTO.
+           modo "tela_cheia" (padrão) ou "dividida": a tela divide SÓ enquanto a foto aparece, foto em cima
+           (1080×956) e ela embaixo (janela de 964 px a partir de `dividida_y` do _edicao.json); fora disso,
+           ela em tela cheia (estilo aprovado pela Fernanda em 18/10/2026).
+           Com "para_anuncio": true no JSON, cada foto fica no máximo IMAGEM_MAX (2,5 s): o Meta barra antes/depois
+           acima de 3 s em ANÚNCIO. No orgânico não há limite (vale o "dur").
+  cenas    [{"arquivo", "em", "dur", "ini"}]   corte de atendimento/procedimento (da pasta cenas/ do bruto) em tela
+           cheia, sem o áudio dele, por cima da fala: "em" no tempo do BRUTO, "ini" = de onde o clipe começa.
+           Duração entre CENA_MIN e CENA_MAX (1,5–4 s).
 
 Faz:
   - corta e junta os trechos (cada trecho é uma entrada -ss/-t do mesmo arquivo; nada de split→concat),
@@ -29,10 +36,12 @@ import config  # noqa: E402
 from PIL import Image, ImageFilter  # noqa: E402
 from montar_ht_peles import camada_legenda, ff, filtro_caminho, LEGENDA_H  # noqa: E402
 
-IMAGEM_MAX = 2.5          # s: regra do Meta pra antes/depois (< 3 s na tela; 2,5 dá margem)
+IMAGEM_MAX = 2.5          # s: regra do Meta pra antes/depois EM ANÚNCIO (< 3 s na tela; 2,5 dá margem); padrão do "dur"
 FOLGA_ANTES, FOLGA_DEPOIS = 0.10, 0.20   # s em volta da fala: a emenda soma 0,30 s, a pausa natural dela entre frases (~0,35)
 ZOOM_EMENDA, ZOOM_CY = 1.10, 860         # trechos ímpares: enquadramento mais fechado, centrado no rosto
 FADE_AUDIO = 0.04
+CENA_MIN, CENA_MAX = 1.5, 4.0            # s de cada cena de atendimento na tela
+FADE_CENA = 0.08
 LEGENDA_Y = 1200          # topo da faixa da legenda (texto em ~1330–1400): abaixo da caixa de título (y≈1130)
 FADE_IMG = 0.15
 FPS = 30
@@ -78,6 +87,20 @@ def com_folga(manter, palavras, dur):
             meio = (novos[n][0] + novos[n - 1][1]) / 2
             novos[n - 1][1] = novos[n][0] = round(meio, 3)
     return novos
+
+
+def png_metade(origem, saida, altura=956):
+    """Foto inteira na metade de cima (1080×altura), sobre ela mesma ampliada e desfocada."""
+    im = Image.open(origem).convert('RGB')
+    esc = max(1080 / im.width, altura / im.height)
+    fundo = im.resize((int(im.width * esc) + 1, int(im.height * esc) + 1), Image.LANCZOS)
+    x, y = (fundo.width - 1080) // 2, (fundo.height - altura) // 2
+    fundo = fundo.crop((x, y, x + 1080, y + altura)).filter(ImageFilter.GaussianBlur(30))
+    fundo = Image.blend(fundo, Image.new('RGB', fundo.size, (0, 0, 0)), 0.3)
+    esc = min(1040 / im.width, (altura - 30) / im.height)
+    frente = im.resize((int(im.width * esc), int(im.height * esc)), Image.LANCZOS)
+    fundo.paste(frente, ((1080 - frente.width) // 2, (altura - frente.height) // 2))
+    fundo.save(saida, quality=95)
 
 
 def no_tempo_da_saida(manter):
@@ -148,20 +171,52 @@ def main():
     pares = ''.join(f'[v{n}][a{n}]' for n in range(len(manter)))
     f.append(f"{pares}concat=n={len(manter)}:v=1:a=1[cv][ca]")
     ultimo = 'cv'
+    for k, c in enumerate(ed.get('cenas', [])):
+        t0 = mapa(c['em'])
+        if t0 is None:
+            raise SystemExit(f"cena {k}: 'em'={c['em']} fora dos trechos mantidos")
+        arq = os.path.join(config.PROJETO, c['arquivo'])
+        ini = float(c.get('ini', 0))
+        dur_arq = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0',
+                                        arq], capture_output=True, text=True).stdout)
+        dur = max(CENA_MIN, min(float(c.get('dur', 3.0)), CENA_MAX, dur_arq - ini, total - t0))
+        i = len(manter) + k
+        entradas += ['-ss', f'{ini:.3f}', '-t', f'{dur:.3f}', '-i', arq]
+        f.append(f"[{i}:v]fps={FPS},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,"
+                 f"format=rgba,fade=t=in:d={FADE_CENA}:alpha=1,fade=t=out:st={dur - FADE_CENA:.3f}:d={FADE_CENA}:alpha=1,"
+                 f"setpts=PTS-STARTPTS+{t0:.3f}/TB[ce{k}]")
+        f.append(f"[{ultimo}][ce{k}]overlay=0:0:eof_action=pass:format=auto[oc{k}]")
+        ultimo = f'oc{k}'
+        print(f'  cena {k}: {t0:.2f}–{t0 + dur:.2f} s na saída ({dur:.1f} s) {os.path.basename(arq)}')
+    n_cenas = len(ed.get('cenas', []))
     for k, img in enumerate(ed.get('imagens', [])):
         t0 = mapa(img['em'])
         if t0 is None:
             raise SystemExit(f"imagem {k}: 'em'={img['em']} fora dos trechos mantidos")
-        dur = min(float(img.get('dur', IMAGEM_MAX)), IMAGEM_MAX)
+        dur = float(img.get('dur', IMAGEM_MAX))
+        if ed.get('para_anuncio'):                 # regra do Meta, só para anúncio
+            dur = min(dur, IMAGEM_MAX)
         png = os.path.join(tmp, f'imagem{k}.jpg')
-        png_imagem(os.path.join(config.PROJETO, img['arquivo']), png)
-        i = len(manter) + k
-        entradas += ['-loop', '1', '-framerate', str(FPS), '-t', f'{dur:.3f}', '-i', png]
-        f.append(f"[{i}:v]format=rgba,fade=t=in:d={FADE_IMG}:alpha=1,fade=t=out:st={dur - FADE_IMG:.3f}:d={FADE_IMG}:alpha=1,"
-                 f"setpts=PTS-STARTPTS+{t0:.3f}/TB[im{k}]")
-        f.append(f"[{ultimo}][im{k}]overlay=0:0:eof_action=pass:format=auto[ov{k}]")
+        i = len(manter) + n_cenas + k
+        modo = img.get('modo', 'tela_cheia')
+        if modo == 'dividida':
+            png_metade(os.path.join(config.PROJETO, img['arquivo']), png)
+            y_ela = int(ed.get('dividida_y', 300))
+            janela = f"between(t,{t0:.3f},{t0 + dur:.3f})"
+            entradas += ['-loop', '1', '-framerate', str(FPS), '-t', f'{dur:.3f}', '-i', png]
+            f.append(f"[{ultimo}]split[sa{k}][sb{k}]")
+            f.append(f"[sb{k}]crop=1080:964:0:{y_ela}[ela{k}]")
+            f.append(f"[sa{k}][ela{k}]overlay=0:956:enable='{janela}'[dv{k}]")
+            f.append(f"[{i}:v]format=rgba,setpts=PTS-STARTPTS+{t0:.3f}/TB[im{k}]")
+            f.append(f"[dv{k}][im{k}]overlay=0:0:eof_action=pass:format=auto[ov{k}]")
+        else:
+            png_imagem(os.path.join(config.PROJETO, img['arquivo']), png)
+            entradas += ['-loop', '1', '-framerate', str(FPS), '-t', f'{dur:.3f}', '-i', png]
+            f.append(f"[{i}:v]format=rgba,fade=t=in:d={FADE_IMG}:alpha=1,fade=t=out:st={dur - FADE_IMG:.3f}:d={FADE_IMG}:alpha=1,"
+                     f"setpts=PTS-STARTPTS+{t0:.3f}/TB[im{k}]")
+            f.append(f"[{ultimo}][im{k}]overlay=0:0:eof_action=pass:format=auto[ov{k}]")
         ultimo = f'ov{k}'
-        print(f'  imagem {k}: {t0:.2f}–{t0 + dur:.2f} s na saída ({dur:.1f} s)')
+        print(f'  imagem {k} ({modo}): {t0:.2f}–{t0 + dur:.2f} s na saída ({dur:.1f} s)')
     f.append(f"movie={filtro_caminho(legenda)},fps={FPS},format=rgba,setpts=PTS-STARTPTS[lg]")
     f.append(f"[{ultimo}][lg]overlay=0:{LEGENDA_Y}:eof_action=pass:format=auto,format=yuv420p[vout]")
     f.append("[ca]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")

@@ -14,6 +14,8 @@ planos/*
 !planos/modelo_organico.json
 !planos/_instrucoes_ganchos.md
 !planos/_instrucoes_bruto.md
+!planos/_estilos_broll.md
+!planos/_fotos.json
 !planos/exemplo/
 
 # gerados
