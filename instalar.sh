@@ -31,6 +31,10 @@ if [[ ! -x bin/ocr_legenda || ocr_legenda.swift -nt bin/ocr_legenda ]]; then
   if command -v swiftc >/dev/null; then swiftc -O ocr_legenda.swift -o bin/ocr_legenda && ok "OCR compilado (bin/ocr_legenda)"
   else falta "swiftc (instale as ferramentas de linha de comando: xcode-select --install)"; fi
 else ok "OCR (bin/ocr_legenda)"; fi
+if [[ ! -x bin/olhar_camera || olhar_camera.swift -nt bin/olhar_camera ]]; then
+  if command -v swiftc >/dev/null; then swiftc -O olhar_camera.swift -o bin/olhar_camera && ok "detector de olhar compilado (bin/olhar_camera)"
+  else falta "swiftc (instale as ferramentas de linha de comando: xcode-select --install)"; fi
+else ok "detector de olhar (bin/olhar_camera)"; fi
 
 # 4) config
 if [[ ! -f config.env ]]; then cp config.exemplo.env config.env; print "criei o config.env: ABRA E AJUSTE os caminhos antes de usar"; else ok "config.env existe"; fi

@@ -17,6 +17,12 @@ O bruto vem de duas formas:
 - **vários takes curtos**, um por frase, com conversa com quem filma entre eles ("ficou bom?", "é isso?", "peraí");
 - **um take longo** com erros, frases repetidas e recomeços.
 
+## Roteiro escrito (quando houver `roteiro` no `<ID>.json`)
+Leia o arquivo inteiro antes de tudo. Ele traz o TÍTULO NA TELA, o GANCHO FALADO, o ROTEIRO e a LEGENDA DO INSTAGRAM.
+- O roteiro manda: o vídeo final segue a ordem e o texto dele. Entre as tentativas gravadas, fique com a que mais se aproxima do texto do roteiro e soa natural (ela pode trocar uma palavra; isso não é erro).
+- Frase do roteiro que não foi gravada: liste em `obs` como "NÃO GRAVADO: …". Frase gravada que não está no roteiro: só mantenha se completar o raciocínio.
+- Copie o título para `"titulo_tela"` (ele aparece no alto nos primeiros 4 s) e a legenda, literal, para `"legenda"`.
+
 ## Passos
 1. Rode `python3 frases.py "<transcrição>"` e leia a fala inteira. Confira também os inícios de take em `takes`: a emenda costuma cair entre eles.
 2. Monte o roteiro final. Ele é a fala da Fernanda, em ordem, sem nada que não seja para o público.
@@ -24,7 +30,8 @@ O bruto vem de duas formas:
    - **Frase repetida** (ela errou e falou de novo): fica a versão MAIS COMPLETA e fluida, em geral a última. Nunca deixe duas versões da mesma ideia.
    - **Ordem:** a do roteiro. Normalmente é a ordem gravada; só mude se for claro que o take saiu fora de ordem.
    - **Mais de um roteiro no mesmo bruto** (ela gravou 2 vídeos de uma vez): avise em `obs` e faça só o primeiro.
-3. Cada trecho mantido vai de `start` da 1ª palavra a `end` da última (2 casas), em frases inteiras. NÃO acrescente folga: o `editar_bruto.py` põe a respiração (0,10 s antes e 0,20 s depois: a emenda fica com 0,30 s, a pausa natural dela entre frases) e alterna o enquadramento a cada trecho.
+   - **ELA PRECISA ESTAR OLHANDO PARA A CÂMERA.** A transcrição não mostra quando ela olha para o lado, para baixo lendo o roteiro ou para quem filma. Em cada tentativa candidata, rode `python3 ferramentas/checar_olhar.py "<vídeo>" --de <início> --ate <fim>` (yaw a cada 0,1 s; "FORA" = desviando). Tentativa com FORA durante a fala é descartada, mesmo que bata palavra por palavra com o roteiro: prefira a que ela fala de frente, ainda que troque uma palavra. (Erro real, 19/10: ela dizia "o formato do rosto, o olhar…" virada a −55°, repassando o texto; a 2ª tentativa, de frente, era a certa.)
+3. Cada trecho mantido vai de `start` da 1ª palavra a `end` da última (2 casas), em frases inteiras. NÃO acrescente folga: o `editar_bruto.py` põe a respiração (0,04 s antes e 0,08 s depois: a emenda fica com ~0,12 s, o ritmo da edição da Fernanda) e alterna o enquadramento a cada trecho.
    - **Palavra esticada:** o Scribe às vezes estica a 1ª palavra de um take para trás (start muito antes do resto, duração de 2 s ou mais). Ache o início real pelo silêncio:
      `ffmpeg -nostdin -ss <t-1> -t 6 -i "<vídeo>" -af silencedetect=noise=-35dB:d=0.25 -f null - 2>&1 | grep silence_`
      (os tempos saem relativos a `t-1`).
@@ -35,6 +42,7 @@ O bruto vem de duas formas:
    - `dur`: no orgânico, o tempo que a fala pede (em geral 2 a 4 s). Se o vídeo também vai virar anúncio, ponha `"para_anuncio": true` no JSON: aí cada foto fica no máximo 2,5 s (o script trava).
    - Pode aparecer mais de uma vez, mas com pelo menos 10 s entre as aparições e no máximo 2 vezes por vídeo.
    - `modo`: `"dividida"` (preferido pela Fernanda: a tela divide SÓ enquanto a foto aparece, foto em cima e ela embaixo, depois volta para ela em tela cheia) ou `"tela_cheia"`. Na dividida, meça a janela do rosto com `python3 ferramentas/medir_janela.py <ID>` (folha com régua) e grave `"dividida_y"` no JSON: o topo da cabeça logo abaixo da borda de cima, rosto e peito dentro dos 964 px.
+   - **Foto abrindo o vídeo (aprovado pela Fernanda em 19/10):** em `dividida`, no começo, a foto ocupa a metade de cima inteira e o título na tela NÃO entra (o script já faz isso).
    - Só use foto do CASO de que ela está falando (a imagem que veio na pasta). Nunca foto ou cena aleatória.
    - Sem lugar natural na fala: use uma vez, no trecho de prova/resultado, e explique em `obs`.
 5. **Cenas de atendimento**, se houver em `cenas`: elas entram em tela cheia, por cima da fala (a voz dela continua e a legenda também).
@@ -56,6 +64,7 @@ Grave em `dados/brutos/<ID>_edicao.json`, exatamente:
  "dividida_y":400,
  "imagens":[{"arquivo":"brutos/entrada/<pasta>/<imagem>","em":0.0,"dur":2.5,"modo":"dividida","_porque":"palavra que aponta"}],
  "cenas":[{"arquivo":"dados/brutos/<ID>_cenas/<cena>.mp4","em":0.0,"dur":3.0,"ini":0.0,"_porque":"fala que combina"}],
+ "titulo_tela":"…","legenda":"…",
  "cta_final":false,
  "sai":[[0.0,0.0,"o que saiu e por quê"]],
  "obs":"..."}

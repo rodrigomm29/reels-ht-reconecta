@@ -4,7 +4,8 @@
 Cada subpasta de `brutos/entrada/` é UM vídeo final:
   - os vídeos (.mov/.mp4) são os takes da fala, juntados na ordem em que foram gravados;
   - as imagens (.jpg/.png/.heic) são material de apoio (ex.: antes/depois), que o editar_bruto.py põe na tela;
-  - a subpasta `cenas/` (opcional) tem os cortes de atendimento/procedimento, que entram por cima da fala.
+  - a subpasta `cenas/` (opcional) tem os cortes de atendimento/procedimento, que entram por cima da fala;
+  - `roteiro.txt` (opcional) é o roteiro escrito: o agente de takes edita por ele.
 
 Para cada pasta nova, este script:
   1. normaliza cada take para 1080×1920, 30 fps constantes, H.264 + AAC 48 kHz (celular grava HEVC, 720p,
@@ -64,6 +65,7 @@ def normalizar(origem, destino, audio=True):
 
 def proximo_id(registro):
     usados = [int(v['id'][2:]) for v in registro.values()]
+    usados += [int(os.path.basename(f)[2:5]) for f in glob.glob(os.path.join(REG_DIR, 'BR[0-9][0-9][0-9]*.json'))]
     return f'BR{max(usados, default=0) + 1:03d}'
 
 
@@ -113,6 +115,9 @@ def importar(pasta, registro):
     info = {'id': vid, 'pasta': os.path.relpath(pasta, config.PROJETO), 'video': os.path.basename(saida),
             'duracao': round(duracao(saida), 2), 'takes': inicios,
             'imagens': [os.path.relpath(i, config.PROJETO) for i in imagens], 'cenas': cenas}
+    roteiro = next((os.path.join(pasta, f) for f in arqs if f.lower() in ('roteiro.txt', 'roteiro.md')), None)
+    if roteiro:                                    # o agente de takes edita pelo roteiro
+        info['roteiro'] = os.path.relpath(roteiro, config.PROJETO)
     json.dump(info, open(os.path.join(REG_DIR, f'{vid}.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     registro[nome] = {'id': vid, 'video': info['video']}
     print(f'{nome} → {vid}: {len(takes)} takes, {info["duracao"]:.1f} s, {len(imagens)} imagem(ns), '

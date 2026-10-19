@@ -1,6 +1,6 @@
 ---
 name: reels-ht
-description: Conduz a rotina diária de variações de Reels deste projeto (baixar → transcrever → escolher Reels base → ganchos por agente → janela → plano → render → conferir → organizar → agendar no Publer). Acionar quando pedirem "variações de hoje", "21 de hoje", "lote do dia", "tela dividida", "programar no Publer", ou para retomar um dia pela metade.
+description: Conduz a rotina diária de variações de Reels deste projeto (baixar → transcrever → escolher Reels base → ganchos por agente → janela → plano → render → conferir → organizar → agendar no Publer). Acionar quando pedirem "variações de hoje", "21 de hoje", "lote do dia", "tela dividida", "programar no Publer", "posts de antes e depois", "carrossel", ou para retomar um dia pela metade.
 ---
 
 # reels-ht — rotina do dia
@@ -57,6 +57,19 @@ O passo a passo com os comandos está no `README.md` (seção 5). Esta skill gua
 - A fila de vídeos termina em `-ht`. Antes do `fila.py montar`, veja se `publicar/filas/<nome>.json` já existe e de quem é: carrossel de outra pessoa NÃO se mistura.
 - Limite: 25 posts no Instagram por 24 h por conta, contando carrossel.
 - Trial Reel sempre MANUAL (o padrão do script).
+
+## Posts de foto (antes e depois)
+- Comandos no README, seção 5.10. Entrada: pasta "Posts Fernanda" do iCloud; lote `FOTOS-SEMnn`.
+- Depois do `importar_fotos.py`, olhe a `_conferencia.jpg` (Read) e mostre à pessoa. Foto torta, cortada ou de outra paciente = pare e pergunte.
+- Legenda vazia: escreva você, no tom da Fernanda, para pacientes:
+  - abre com o resultado visível (o que mudou);
+  - explica em 1–2 frases o que foi feito, sem jargão;
+  - fecha com "cada pele responde de um jeito" ou parecido, e o convite para a avaliação (link da bio);
+  - até 5 hashtags do `HASHTAGS` do config;
+  - nunca preço, promoção, "garantido" ou prazo prometido (regra do CFM).
+- Mostre as legendas à pessoa antes do `fila.py montar-fotos`.
+- Carrossel vai pro FEED (não é Trial Reel). Escolha um horário sem Reel e rode `--simular` antes.
+- O 1º carrossel real roda com `--max 1`: a doc do Publer diverge no `type` ("photo" × "carousel"). Se o Publer recusar, o item fica "recusado" (nada criado): troque `TIPO_CARROSSEL` no `publer_postar.py` e repita com `--repetir-erros`.
 
 ## No fim
 - Diga quantos foram agendados, os horários, o que ficou de fora e por quê.

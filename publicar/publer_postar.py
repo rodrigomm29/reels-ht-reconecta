@@ -43,6 +43,16 @@ Doc oficial seguida (índice em https://publer.com/docs/llms.txt):
   - GET /media/{id} traz validity "derived from size, dimensions, format and duration" (vídeo já processado)
   - Account: id, provider, name, social_id, picture, type (Instagram = "business"); "status" só no exemplo
 
+Carrossel de fotos (fila do fila.py montar-fotos, itens com "fotos" no lugar de "video"), só no Instagram:
+  lida em 19/10/2026: posting/create-posts/content-types/photo-posts, networks e api-reference/media:
+  - cada foto sobe pelo mesmo POST /media (Content-Type image/jpeg) e volta com type "photo";
+  - post: networks.instagram {type "photo", text, media [{id, type "photo"}, ...]} ("Must be photo" na página de
+    fotos). A página networks mostra o mesmo post como type "carousel" com media type "image": conflito na doc;
+    seguimos a página de fotos, que é a específica, e o enum de Media (photo|video|gif). Se a API recusar, o POST
+    volta 4xx, o item fica na etapa "recusado" (nada criado) e dá pra trocar TIPO_CARROSSEL e repetir;
+  - até 10 fotos, 8 MB cada, legenda até 2.200; vai pro feed (não é Trial Reel; --trial não se aplica);
+  - conta e limite de 24 h são os mesmos do Instagram: carrossel conta nos 25 posts por dia.
+
 Proteção contra post duplicado (não existe chave de idempotência na API):
   - o item vira "agendando" na fila ANTES do POST /posts/schedule (e ganha o job_id logo que ele chega); todo
     POST também vai pro diário filas/<fila>.posts.log (só acréscimo);
@@ -76,6 +86,7 @@ uso:
   python3 publer_postar.py postar SEM41-terca --rede instagram --inicio "2026-10-07 08:00" --intervalo 20 --por-dia 21 --max 1
   python3 publer_postar.py postar SEM41-terca --rede tiktok --inicio "2026-10-07 09:00" --horarios "09:00,13:00,19:00"
   python3 publer_postar.py postar SEM41-terca --rede instagram --inicio "2026-10-08 08:00" --intervalo 20 --por-dia 21 --forcar VD005_A
+  python3 publer_postar.py postar FOTOS-SEM44 --rede instagram --inicio "2026-10-27 12:00" --horarios "12:00" --simular
   python3 publer_postar.py autoteste
 """
 import argparse
@@ -116,6 +127,7 @@ LIMITE_TIKTOK_DIA = 25                 # doc: TikTok Videos no plano Business, p
 LIMITE_INSTAGRAM_DIA = min(25, 100)    # doc Publer: Instagram Posts & Reels 25/24 h (Business); Meta: 100/24 h via API
 PRIVACIDADES = ('PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY')
 TRIAL_MODOS = ('MANUAL', 'SS_PERFORMANCE')   # doc: networks.instagram.details.trial_reel
+REEL_NORMAL = 'NAO'                    # --trial NAO: Reel normal (feed + seguidores), details {type reel, feed true}
 TRIAL_PADRAO = 'MANUAL'                # decisão do Sávio (06/10/2026): só a vencedora vai pros seguidores, à mão
 # o que muda por rede; durações em segundos (None = sem checagem local)
 REDES = {
@@ -138,6 +150,10 @@ AVISO_TRAVADO = ('o post existe no Publer, mas não vai sair assim: resolva lá 
 # filtros de GET /posts (doc, "State Values") que indicam post agendado que NÃO vai sair como está
 FILTROS_TRAVA = ('scheduled_locked', 'scheduled_reauth', 'scheduled_pending', 'scheduled_declined')
 HORARIOS_PADRAO = '09:00,13:00,19:00'
+LIMITE_FOTO = 8 * 1000 * 1000          # doc (photo-posts): Instagram 8 MB por foto
+MAX_FOTOS = 10                         # doc: até 10 fotos por carrossel no Instagram
+TIPO_CARROSSEL = 'photo'               # doc photo-posts: networks.instagram.type "photo" (networks diz "carousel")
+TIPO_MIDIA_FOTO = 'photo'              # enum de Media: photo | video | gif
 MARGEM_PLANO = dt.timedelta(minutes=15)    # no plano, horário a menos de 15 min de agora é pulado
 MARGEM_POST = dt.timedelta(minutes=2)      # na hora de agendar, tem que faltar >= 2 min (doc exige >= 1 min)
 TIMEOUT_JSON = 60
@@ -657,6 +673,61 @@ def contar_hashtags(texto):
     return len(re.findall(r'#\w+', texto or ''))
 
 
+def eh_carrossel(item):
+    """Item da fila de fotos (fila.py montar-fotos): tem "fotos" no lugar de "video"."""
+    return bool(item.get('fotos'))
+
+
+def checar_foto_enviada(enviado):
+    if not isinstance(enviado, dict) or not enviado.get('id'):
+        raise ErroPubler(f'o upload não devolveu id de mídia: {str(enviado)[:300]}')
+    tipo = enviado.get('type')
+    if tipo and tipo not in ('photo', 'image'):
+        raise ErroPubler(f'o Publer classificou a foto como "{tipo}", não como foto')
+    t = validade_da_rede(enviado, 'instagram')
+    if t is False or (isinstance(t, dict) and t.get('post') is False):
+        raise ErroPubler(f'o Publer diz que esta foto não serve pra post do Instagram '
+                         f'(validity.instagram = {json.dumps(t, ensure_ascii=False)})')
+
+
+def corpo_carrossel(conta_id, ids_midia, texto, quando):
+    return {'bulk': {'state': 'scheduled', 'posts': [{
+        'networks': {'instagram': {
+            'type': TIPO_CARROSSEL,
+            'text': texto,
+            'media': [{'id': mid, 'type': TIPO_MIDIA_FOTO} for mid in ids_midia],
+        }},
+        'accounts': [{'id': conta_id, 'scheduled_at': quando.isoformat(timespec='seconds')}],
+    }]}}
+
+
+def validar_corpo_carrossel(c):
+    b = c.get('bulk') if isinstance(c, dict) else None
+    exigir(isinstance(b, dict) and b.get('state') == 'scheduled', 'bulk.state != scheduled')
+    exigir(isinstance(b.get('posts'), list) and len(b['posts']) == 1, 'bulk.posts precisa ter 1 post')
+    p = b['posts'][0]
+    redes = p.get('networks') or {}
+    exigir(isinstance(redes, dict) and list(redes) == ['instagram'], f'networks precisa ter só "instagram" ({list(redes)})')
+    t = redes['instagram']
+    exigir(isinstance(t, dict) and t.get('type') == TIPO_CARROSSEL, f'networks.instagram.type != {TIPO_CARROSSEL}')
+    exigir(isinstance(t.get('text'), str) and 0 < len(t['text']) <= LIMITE_TEXTO, 'text vazio ou > 2200')
+    m = t.get('media')
+    exigir(isinstance(m, list) and 1 <= len(m) <= MAX_FOTOS, f'media precisa de 1 a {MAX_FOTOS} fotos')
+    exigir(all(isinstance(x, dict) and x.get('id') and x.get('type') == TIPO_MIDIA_FOTO for x in m),
+           f'toda media precisa de id e type "{TIPO_MIDIA_FOTO}"')
+    exigir(len({x['id'] for x in m}) == len(m), 'a mesma foto aparece duas vezes no carrossel')
+    exigir('details' not in t, 'carrossel não leva details (nada de reel/trial)')
+    n = contar_hashtags(t['text'])
+    exigir(n <= REDES['instagram']['max_hashtags'], f'{n} hashtags (o Instagram aceita no máx. 30)')
+    a = p.get('accounts')
+    exigir(isinstance(a, list) and len(a) == 1 and a[0].get('id'), 'accounts precisa de 1 conta com id')
+    try:
+        q = dt.datetime.fromisoformat(a[0].get('scheduled_at') or '')
+    except ValueError:
+        q = None
+    exigir(q is not None and q.tzinfo is not None, 'scheduled_at sem data ISO 8601 com fuso')
+
+
 def corpo_post(rede, conta_id, midia, texto, quando, args):
     if rede == 'tiktok':
         rede_corpo = {
@@ -668,12 +739,15 @@ def corpo_post(rede, conta_id, midia, texto, quando, args):
                         'promotional': False, 'paid': False, 'reminder': False},
         }
     else:
-        # Trial Reel: sem "feed" (trial não vai pro feed); a 1ª miniatura (índice 0) é a capa
+        # Trial Reel: sem "feed" (trial não vai pro feed); a 1ª miniatura (índice 0) é a capa.
+        # Reel normal (--trial NAO): sem trial_reel e com feed true (doc: "true to also post Reel in Feed tab")
+        detalhes = ({'type': 'reel', 'feed': True} if args.trial == REEL_NORMAL
+                    else {'type': 'reel', 'trial_reel': args.trial})
         rede_corpo = {
             'type': 'video',
             'text': texto,
             'media': [{**midia, 'default_thumbnail': 0}],
-            'details': {'type': 'reel', 'trial_reel': args.trial},
+            'details': detalhes,
         }
     return {'bulk': {'state': 'scheduled', 'posts': [{
         'networks': {rede: rede_corpo},
@@ -708,8 +782,11 @@ def validar_corpo(c, rede):
                'comment/duet/stitch não booleanos')
     else:
         exigir(d.get('type') == 'reel', f'details.type precisa ser "reel" ({d.get("type")})')
-        exigir(d.get('trial_reel') in TRIAL_MODOS, f'details.trial_reel inválido: {d.get("trial_reel")}')
-        exigir('feed' not in d, 'details.feed não vai em Trial Reel (trial não aparece no feed)')
+        if 'trial_reel' in d:
+            exigir(d.get('trial_reel') in TRIAL_MODOS, f'details.trial_reel inválido: {d.get("trial_reel")}')
+            exigir('feed' not in d, 'details.feed não vai em Trial Reel (trial não aparece no feed)')
+        else:
+            exigir(d.get('feed') is True, 'Reel normal precisa de details.feed true')
         dt_idx = m[0].get('default_thumbnail')
         exigir(isinstance(dt_idx, int) and 0 <= dt_idx < len(m[0]['thumbnails']),
                f'media[0].default_thumbnail fora das miniaturas ({dt_idx})')
@@ -1175,7 +1252,18 @@ def problemas_do_item(item, rede):
     p = []
     cfg = REDES[rede]
     video = item.get('video') or ''
-    if not os.path.isfile(video):
+    if eh_carrossel(item):
+        fotos = item['fotos']
+        if rede != 'instagram':
+            p.append(f'carrossel de fotos só sai no Instagram (não no {cfg["nome"]})')
+        if len(fotos) > MAX_FOTOS:
+            p.append(f'{len(fotos)} fotos; o carrossel do Instagram aceita até {MAX_FOTOS}')
+        for f in fotos:
+            if not os.path.isfile(f):
+                p.append(f'foto não encontrada: {f}')
+            elif os.path.getsize(f) > LIMITE_FOTO:
+                p.append(f'{os.path.basename(f)} com {os.path.getsize(f) / 1e6:.1f} MB passa de 8 MB')
+    elif not os.path.isfile(video):
         p.append('vídeo não encontrado (o disco está montado?)')
     elif os.path.getsize(video) > LIMITE_UPLOAD:
         p.append(f'vídeo com {os.path.getsize(video) / 1e6:.1f} MB passa de 200 MB')
@@ -1225,6 +1313,8 @@ def fmt_quando(q):
 
 
 def fmt_duracao(item):
+    if eh_carrossel(item):
+        return f'{len(item["fotos"])} fts'
     video = item.get('video') or ''
     dur = duracao_video(video) if os.path.isfile(video) else None
     return f'{dur:5.0f}s' if dur is not None else '    ?'
@@ -1236,7 +1326,7 @@ def imprimir_tabela(plano, rede):
     for item, quando in plano:
         video = item.get('video') or ''
         tam = os.path.getsize(video) if os.path.isfile(video) else item.get('bytes') or 0
-        arq = os.path.basename(video)
+        arq = f'{item.get("nome") or ""} (carrossel)' if eh_carrossel(item) else os.path.basename(video)
         arq = arq if len(arq) <= 30 else arq[:29] + '…'
         leg = ' '.join((item.get('legenda') or '').split())
         leg = leg if len(leg) <= 48 else leg[:47] + '…'
@@ -1468,10 +1558,16 @@ def processar_item(cli, semana, rid, quando, conta, args):
               'Rode de novo pra replanejar.')
         return False
     ultimo = estado_bruto(item, rede)     # o que está em disco agora; toda gravação confere contra isto
-    print(f'\n[{rid}] {os.path.basename(item["video"])} -> {fmt_quando(quando)}', flush=True)
+    carrossel = eh_carrossel(item)
+    rotulo = f'{item.get("nome") or rid} ({len(item["fotos"])} fotos)' if carrossel else os.path.basename(item['video'])
+    print(f'\n[{rid}] {rotulo} -> {fmt_quando(quando)}', flush=True)
     base = {'scheduled_at': quando.isoformat(timespec='seconds'), 'conta_publer': conta_id,
             'conta_nome': str(conta.get('name') or '')}
-    if rede == 'instagram':
+    if carrossel:
+        base['tipo'] = 'carrossel'
+    elif rede == 'instagram' and args.trial == REEL_NORMAL:
+        base['tipo'] = 'reel_normal'
+    elif rede == 'instagram':
         base['trial_reel'] = args.trial
     anteriores = anteriores_de(item, rede)
     if anteriores:
@@ -1480,20 +1576,37 @@ def processar_item(cli, semana, rid, quando, conta, args):
     try:
         garantir_futuro(quando, 'antes do upload')
         campos = {'in_library': 'true'} if args.biblioteca else {}
-        enviado = desembrulhar(cli.upload(item['video'], campos))
-        if isinstance(enviado, dict) and enviado.get('id'):
-            extra['media_id'] = enviado['id']
-        etapa = 'midia'
-        duracao = duracao_video(item['video'])
-        checar_midia_enviada(enviado, rede, duracao)
-        validade = validade_da_rede(enviado, rede)
-        print(f'  upload ok (mídia {enviado["id"]}' +
-              (f'; validity.{rede} = {json.dumps(validade, ensure_ascii=False)}' if validade is not None else '') +
-              ')', flush=True)
-        midia = preparar_midia(cli, enviado, rede, duracao)
-        etapa = 'montar'
-        corpo = corpo_post(rede, conta_id, midia, item['legenda'].strip(), quando, args)
-        validar_corpo(corpo, rede)
+        if carrossel:
+            ids = []
+            for i, foto in enumerate(item['fotos'], 1):
+                etapa = 'upload'
+                garantir_futuro(quando, 'antes do upload')
+                enviado = desembrulhar(cli.upload(foto, campos, progresso=False))
+                if isinstance(enviado, dict) and enviado.get('id'):
+                    ids.append(enviado['id'])
+                    extra['media_ids'] = list(ids)
+                    extra['media_id'] = ids[0]
+                etapa = 'midia'
+                checar_foto_enviada(enviado)
+                print(f'  foto {i}/{len(item["fotos"])} ok (mídia {enviado["id"]})', flush=True)
+            etapa = 'montar'
+            corpo = corpo_carrossel(conta_id, ids, item['legenda'].strip(), quando)
+            validar_corpo_carrossel(corpo)
+        else:
+            enviado = desembrulhar(cli.upload(item['video'], campos))
+            if isinstance(enviado, dict) and enviado.get('id'):
+                extra['media_id'] = enviado['id']
+            etapa = 'midia'
+            duracao = duracao_video(item['video'])
+            checar_midia_enviada(enviado, rede, duracao)
+            validade = validade_da_rede(enviado, rede)
+            print(f'  upload ok (mídia {enviado["id"]}' +
+                  (f'; validity.{rede} = {json.dumps(validade, ensure_ascii=False)}' if validade is not None else '') +
+                  ')', flush=True)
+            midia = preparar_midia(cli, enviado, rede, duracao)
+            etapa = 'montar'
+            corpo = corpo_post(rede, conta_id, midia, item['legenda'].strip(), quando, args)
+            validar_corpo(corpo, rede)
         garantir_futuro(quando, 'antes de agendar')
         # grava ANTES de criar o post: se o processo morrer daqui em diante (Terminal fechado, reboot),
         # a próxima rodada vê "agendando" e confere no Publer em vez de criar um segundo post
@@ -1501,7 +1614,8 @@ def processar_item(cli, semana, rid, quando, conta, args):
         gravar_estado(semana, rid, agendando, ultimo, rede)
         ultimo = agendando
         anotar_diario(semana, {'evento': 'antes_do_post', 'id': rid, 'rede': rede, 'conta_publer': conta_id,
-                               'scheduled_at': base['scheduled_at'], 'media_id': extra.get('media_id')})
+                               'scheduled_at': base['scheduled_at'], 'media_id': extra.get('media_id'),
+                               **({'media_ids': extra['media_ids']} if carrossel else {})})
         etapa = 'agendar'
         resp = desembrulhar(cli.json('POST', '/posts/schedule', corpo=corpo))
         job_id = resp.get('job_id') if isinstance(resp, dict) else None
@@ -1569,6 +1683,8 @@ def processar_item(cli, semana, rid, quando, conta, args):
     post_id, motivo = verificar_post(cli, conta_id, quando, item['legenda'], plano)
     final = {'status': TRAVADO if motivo else 'agendado_publer', **base, 'media_id': extra['media_id'],
              'job_id': extra['job_id'], 'quando': agora_iso()}
+    if carrossel:
+        final['media_ids'] = extra['media_ids']
     if motivo:
         final.update(motivo=motivo, aviso=AVISO_TRAVADO)
     if post_id:
@@ -1586,10 +1702,11 @@ def processar_item(cli, semana, rid, quando, conta, args):
         return False
     if motivo:
         print(f'  ATENÇÃO: o post foi criado no Publer para {fmt_quando(quando)}, mas está TRAVADO: {motivo}.\n'
-              f'  {AVISO_TRAVADO}\n  Parei o lote aqui pra não subir os outros vídeos pro mesmo travamento.')
+              f'  {AVISO_TRAVADO}\n  Parei o lote aqui pra não subir os outros posts pro mesmo travamento.')
         return False
     print(f'  agendado no Publer ({REDES[rede]["nome"]}'
-          + (f', Trial Reel {args.trial}' if rede == 'instagram' else '') + f') para {fmt_quando(quando)}'
+          + (', carrossel no feed' if carrossel else (', REEL NORMAL no feed' if args.trial == REEL_NORMAL else f', Trial Reel {args.trial}') if rede == 'instagram' else '')
+          + f') para {fmt_quando(quando)}'
           + (f' (post {post_id})' if post_id else ''), flush=True)
     return True
 
@@ -1696,10 +1813,14 @@ def descrever_agenda(args, horarios, por_dia, inicio):
     return f'{txt} (Brasília), a partir de {fmt_quando(inicio)}'
 
 
-def descrever_opcoes(args):
+def descrever_opcoes(args, fila=None):
+    if fila and fila.get('tipo') == 'carrossel':
+        return 'carrossel de fotos no FEED do Instagram (sai pros seguidores; não é Trial Reel)'
     if args.rede == 'tiktok':
         return (f'privacidade {args.privacidade}; comentários {"não" if args.sem_comentarios else "sim"}, '
                 f'duet {"não" if args.sem_duet else "sim"}, stitch {"não" if args.sem_stitch else "sim"}')
+    if args.trial == REEL_NORMAL:
+        return 'REEL NORMAL: vai pro feed e pros seguidores (não é Trial Reel)'
     if args.trial == 'MANUAL':
         return 'Trial Reel MANUAL: não vai pro feed nem pros seguidores; você libera a vencedora no app'
     return f'Trial Reel {args.trial}: não vai pro feed; o Instagram PODE liberar sozinho pros seguidores'
@@ -1709,9 +1830,10 @@ def imprimir_plano(fila, plano, pulados, a_conferir, args, horarios, por_dia, in
     """Mostra o plano e devolve a lista de problemas [(id, problema)]."""
     nome = REDES[args.rede]['nome']
     resumo_pulados = ', '.join(f'{k}: {v}' for k, v in sorted(pulados.items()))
-    print(f'fila {fila["semana"]}: {len(fila["itens"])} vídeos; {len(plano)} a agendar no {nome}'
+    tipo_itens = 'carrosséis' if fila.get('tipo') == 'carrossel' else 'vídeos'
+    print(f'fila {fila["semana"]}: {len(fila["itens"])} {tipo_itens}; {len(plano)} a agendar no {nome}'
           + (f'; pulados ({resumo_pulados})' if pulados else ''))
-    print(f'{descrever_agenda(args, horarios, por_dia, inicio)}; {descrever_opcoes(args)}')
+    print(f'{descrever_agenda(args, horarios, por_dia, inicio)}; {descrever_opcoes(args, fila)}')
     if plano:
         print(f'plano: de {fmt_quando(plano[0][1])} a {fmt_quando(plano[-1][1])}')
     if info.get('passados'):
@@ -1762,9 +1884,11 @@ def conferir_opcoes(args):
         sys.exit(f'{", ".join(so_tiktok)}: opção só do TikTok, não vale com --rede instagram')
     if args.trial is None:
         args.trial = TRIAL_PADRAO
-    elif args.trial not in TRIAL_MODOS:
-        sys.exit(f'--trial precisa ser um de: {", ".join(TRIAL_MODOS)}')
-    if args.trial != TRIAL_PADRAO:
+    elif args.trial not in TRIAL_MODOS + (REEL_NORMAL,):
+        sys.exit(f'--trial precisa ser um de: {", ".join(TRIAL_MODOS + (REEL_NORMAL,))}')
+    if args.trial == REEL_NORMAL:
+        print('ATENÇÃO: --trial NAO. REEL NORMAL: vai pro feed e pros seguidores na hora agendada.')
+    elif args.trial != TRIAL_PADRAO:
         print(f'ATENÇÃO: --trial {args.trial}. O Instagram pode liberar sozinho pros seguidores o Reel que for bem '
               '(a ajuda do Publer fala em até ~72 h), e com várias versões do mesmo Reel no dia mais de uma pode\n'
               f'  chegar aos seguidores. A decisão de 06/10/2026 é {TRIAL_PADRAO}.')
@@ -1927,7 +2051,8 @@ def cmd_postar(args, base=BASE, chave=None, usar_keychain=True):
                 print(f'\n{feitos} de {len(plano)} agendados antes de parar.')
                 return 1
             feitos += 1
-        print(f'\npronto: {feitos} vídeo(s) agendado(s) no Publer ({nome}).')
+        print(f'\npronto: {feitos} ' + ('carrossel(éis)' if fila.get('tipo') == 'carrossel' else 'vídeo(s)')
+              + f' agendado(s) no Publer ({nome}).')
         if a_conferir:
             print(f'atenção: {len(a_conferir)} item(ns) ficaram de fora por não dar pra confirmar no Publer '
                   f'({", ".join(i["id"] for i in a_conferir)}).')
@@ -2097,6 +2222,13 @@ def cmd_autoteste(args):
                     self._resp(429, {'error': 'Rate limit exceeded. Retry later.'}, {'Retry-After': '1'})
                     return
                 mid = f'midia-{len(srv["uploads"])}'
+                with open(reg['arquivo'], 'rb') as fh:
+                    cabeca = fh.read(2048)
+                if b'Content-Type: image/' in cabeca:        # foto do carrossel: o Publer devolve type "photo"
+                    self._resp(200, {'id': mid, 'type': 'photo', 'path': f'/media/{mid}.jpg',
+                                     'validity': {'instagram': {'post': srv.get('validade_foto', True), 'reel': False,
+                                                                'story': True}}, 'name': 'x.jpg'})
+                    return
                 self._resp(200, {'id': mid, 'type': 'video', 'path': f'/media/{mid}', 'thumbnail': f'/media/{mid}.jpg',
                                  'validity': {'tiktok': {'video': True},
                                               'instagram': {'reel': srv['validade_ig'], 'post': True, 'story': False}},
@@ -3050,6 +3182,69 @@ def cmd_autoteste(args):
                                                             '--simular', *extra_])
             recusas += str(r_).startswith('exit:')
         conferir(recusas == 2, 'o invólucro publer_tiktok.py recusa --rede instagram e --trial')
+
+        # 31) carrossel de fotos (fila do fila.py montar-fotos): sobe cada foto e agenda um post no feed
+        print('31) carrossel de fotos no Instagram (fila de fotos)')
+
+        def jpg(nome, kb=60):
+            p_ = os.path.join(tmp.name, nome)
+            with open(p_, 'wb') as fh:
+                fh.write(b'\xff\xd8\xff\xe0' + os.urandom(kb * 1024))
+            return p_
+
+        def item_foto(rid, legenda, n=3):
+            fotos_ = [jpg(f'{rid}_{k:02d}.jpg') for k in range(1, n + 1)]
+            return {'id': rid, 'nome': f'post {rid}', 'fotos': fotos_, 'legenda': legenda,
+                    'bytes': sum(os.path.getsize(f_) for f_ in fotos_),
+                    'estado': {'tiktok': {'status': 'nao_se_aplica'}, 'youtube': {'status': 'nao_se_aplica'},
+                               'instagram': {'status': 'pendente'}}}
+
+        def fila_fotos(semana, *itens):
+            filamod.salvar({'semana': semana, 'tipo': 'carrossel', 'contas': {'instagram': '@anadareconecta'},
+                            'itens': list(itens)})
+
+        fila_fotos('FOTOSTESTE', item_foto('P01', 'Antes e depois P01 #rejuvenescimentofacial'),
+                   item_foto('P02', 'Antes e depois P02', n=2))
+        n0, u0 = len(srv['posts']), len(srv['uploads'])
+        rc, txt = ig('FOTOSTESTE', '--inicio', f'{dia(40)} 12:00', '--horarios', '12:00')
+        g = estados('FOTOSTESTE', 'instagram')
+        conferir(rc == 0 and len(srv['posts']) == n0 + 2 and len(srv['uploads']) == u0 + 5,
+                 f'2 carrosséis agendados com 5 uploads de foto (rc {rc}, {len(srv["posts"]) - n0} POSTs, '
+                 f'{len(srv["uploads"]) - u0} uploads)')
+        c1 = srv['posts'][n0]['bulk']['posts'][0]['networks']['instagram'] if len(srv['posts']) > n0 else {}
+        conferir(c1.get('type') == TIPO_CARROSSEL and [m_.get('type') for m_ in c1.get('media', [])] == ['photo'] * 3
+                 and 'details' not in c1 and c1.get('text') == 'Antes e depois P01 #rejuvenescimentofacial',
+                 f'payload: type {TIPO_CARROSSEL}, 3 fotos type photo, sem details (não é Trial Reel)')
+        conferir([m_['id'] for m_ in c1.get('media', [])] == g['P01'].get('media_ids'),
+                 'payload: as fotos na ordem dos uploads, iguais ao media_ids gravado na fila')
+        conferir([dt.datetime.fromisoformat(g[k]['scheduled_at']).strftime('%d %H:%M') for k in ('P01', 'P02')] ==
+                 [dt.datetime.fromisoformat(iso(40, '12:00')).strftime('%d %H:%M'),
+                  dt.datetime.fromisoformat(iso(41, '12:00')).strftime('%d %H:%M')],
+                 'um carrossel por dia às 12:00')
+        conferir(all(v.get('status') == 'agendado_publer' and v.get('tipo') == 'carrossel' and 'trial_reel' not in v
+                     for v in g.values()), 'estado: agendado_publer, tipo carrossel, sem trial_reel')
+        conferir('carrossel de fotos no FEED' in txt and 'Trial Reel MANUAL' not in txt,
+                 'o plano avisa que vai pro feed (e não fala em Trial Reel)')
+        rc, _ = ig('FOTOSTESTE', '--inicio', f'{dia(40)} 12:00', '--horarios', '12:00')
+        conferir(rc == 0 and len(srv['posts']) == n0 + 2, 'rodada repetida não reposta carrossel já agendado')
+        fila_fotos('FOTOSRUINS', item_foto('P11', 'Onze fotos', n=11))
+        n0, u0 = len(srv['posts']), len(srv['uploads'])
+        rc, txt = ig('FOTOSRUINS', '--inicio', f'{dia(42)} 12:00', '--horarios', '12:00')
+        conferir(rc == 1 and len(srv['uploads']) == u0 and 'aceita até 10' in txt,
+                 'carrossel com 11 fotos é barrado antes de qualquer upload')
+        fila_fotos('FOTOSTIKTOK', {**item_foto('P21', 'Para o TikTok'),
+                                   'estado': {'tiktok': {'status': 'pendente'}, 'instagram': {'status': 'pendente'}}})
+        a_tk = montar_parser('tiktok').parse_args(['postar', 'FOTOSTIKTOK', '--inicio', f'{dia(42)} 12:00'])
+        r_, txt = saida_de(cmd_postar, a_tk, base=base, chave=CHAVE, usar_keychain=False)
+        conferir(r_ == 1 and len(srv['uploads']) == u0 and 'só sai no Instagram' in txt,
+                 'carrossel na rede TikTok é barrado (só Instagram), sem upload')
+        srv['validade_foto'] = False
+        fila_fotos('FOTOSINVAL', item_foto('P31', 'Foto inválida', n=2))
+        rc, txt = ig('FOTOSINVAL', '--inicio', f'{dia(43)} 12:00', '--horarios', '12:00')
+        g = estados('FOTOSINVAL', 'instagram')
+        conferir(rc == 1 and g['P31'].get('status') == 'erro' and g['P31'].get('etapa') == 'midia'
+                 and len(srv['posts']) == n0, 'foto com validity.instagram.post false para na etapa "midia", sem POST')
+        srv['validade_foto'] = True
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -3103,7 +3298,7 @@ def montar_parser(rede_fixa=None):
     p.add_argument('--sem-duet', action='store_true', help='só TikTok: desliga duet (padrão: liberado)')
     p.add_argument('--sem-stitch', action='store_true', help='só TikTok: desliga stitch (padrão: liberado)')
     if rede_fixa != 'tiktok':
-        p.add_argument('--trial', choices=TRIAL_MODOS,
+        p.add_argument('--trial', choices=TRIAL_MODOS + (REEL_NORMAL,),
                        help=f'só Instagram: modo do Trial Reel (padrão: {TRIAL_PADRAO}; SS_PERFORMANCE deixa o '
                             'Instagram liberar sozinho pros seguidores)')
     p.add_argument('--biblioteca', action='store_true', help='guarda o vídeo na biblioteca de mídia do Publer')

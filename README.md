@@ -261,6 +261,24 @@ A partir daí, siga a rotina normal (5.3 em diante) com o id `BR001E` para as 3 
 - **Antes e depois:** sem limite no orgânico. Em vídeo para anúncio (`"para_anuncio": true` no `_edicao.json`), no máximo **2,5 s** por aparição, travado no script, porque o Meta barra acima de 3 s.
 - **Ganchos:** os agentes não usam o `blocos_legenda.py` nesses vídeos (a legenda é nossa, sincronizada com a fala) e cortam pela fronteira das palavras.
 
+### 5.10 Posts de foto (antes e depois em carrossel)
+A Fernanda manda as fotos pela pasta **"Posts Fernanda"** do iCloud Drive, uma subpasta por post. Dentro de cada subpasta vão as fotos na ordem do carrossel (nome com "antes" vem primeiro, "depois" em seguida, o resto pelo nome) e, se ela quiser, um `legenda.txt`. Subpastas que começam com `_` são ignoradas. O `_COMO USAR.txt` da pasta explica isso para ela. Para ela enviar, compartilhe a pasta com ela no Finder (Compartilhar → Colaborar).
+```bash
+python3 ferramentas/importar_fotos.py FOTOS-SEM44                # 4:5 (1080×1350), HEIC → JPEG, sem EXIF/GPS
+python3 ferramentas/importar_fotos.py FOTOS-SEM44 --lado-a-lado  # + capa ANTES | DEPOIS (posts com 2 fotos)
+# olhe dados/fotos/FOTOS-SEM44/_conferencia.jpg e escreva as legendas vazias em dados/fotos/FOTOS-SEM44/Pnn/legenda.txt
+cd publicar
+python3 fila.py montar-fotos FOTOS-SEM44                         # recusa se faltar legenda ou foto
+python3 publer_postar.py postar FOTOS-SEM44 --rede instagram --inicio "2026-10-27 10:00" --horarios "10:00" \
+    --conta <id> --conta-confirmada "Fernanda Porto | Rejuvenescimento Facial" --simular
+python3 publer_postar.py postar FOTOS-SEM44 --rede instagram --inicio "2026-10-27 10:00" --horarios "10:00" \
+    --conta <id> --conta-confirmada "Fernanda Porto | Rejuvenescimento Facial" --max 1   # 1º de teste
+```
+- **Vai pro feed**, não é Trial Reel. Sai para os seguidores no horário marcado.
+- **Horário:** use um horário que não tenha Reel. Horário já ocupado na conta é pulado para o dia seguinte.
+- **Pasta já importada** é pulada. Para refazer, use `--de-novo "nome da pasta"`; a legenda já escrita é mantida.
+- **CFM:** só foto com autorização escrita da paciente, legenda educativa, sem promessa de resultado e sem preço.
+
 ---
 
 ## 6. Estilos
@@ -316,8 +334,8 @@ escrever_legendas.py  legenda do post + título, por vídeo
 organizar_organico.py uma pasta por vídeo (mp4 + título + legenda)
 kit_peles.py          gera o kit de efeitos (só com os pacotes pagos)
 ranquear_reels.py     modo "campeões": ranqueia por curtidas + comentários
-publicar/             fila e agendamento no Publer
-ferramentas/          novo_lote, normalizar_broll, triagem_broll, medir_janela
+publicar/             fila e agendamento no Publer (vídeos e carrosséis de foto)
+ferramentas/          novo_lote, normalizar_broll, triagem_broll, medir_janela, importar_fotos
 planos/               modelo do plano + instruções dos agentes (o resto é local)
 scribe/               chamada do Scribe + vocab.exemplo.txt (copie para vocab.txt, que fica fora do git)
 fontes/               Inter (OFL)

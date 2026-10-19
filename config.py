@@ -65,6 +65,9 @@ LUTS = [x for x in (valor('LUT_1', ''), valor('LUT_2', ''), valor('LUT_3', '')) 
 CINEVA_DIR = valor('CINEVA_DIR', '')
 PACK_EDITOR_DIR = valor('PACK_EDITOR_DIR', '')
 TELA_FINAL = valor('TELA_FINAL', '')
+# posts de foto (antes/depois): uma subpasta por post, enviada pela pessoa (pasta compartilhada do iCloud)
+POSTS_FOTOS_DIR = valor('POSTS_FOTOS_DIR', '~/Library/Mobile Documents/com~apple~CloudDocs/Posts Fernanda')
+FOTOS_DIR = valor('FOTOS_DIR', os.path.join(REELS_BASE, 'fotos'))           # fotos tratadas, um lote por pasta
 
 # ---- fontes (Inter vem no repo; as outras são opcionais e pagas)
 FONTE_FORTE = valor('FONTE_FORTE', os.path.join(FONTES_DIR, 'Grift-Black.ttf'))
@@ -84,7 +87,11 @@ DIVIDIDA_Y_PADRAO = int(valor('DIVIDIDA_Y_PADRAO', '300'))
 LEGENDA_FAIXA_Y = valor('LEGENDA_FAIXA_Y', '1200')          # número ou "auto" (medida por vídeo)
 LEGENDA_FAIXA_H = int(valor('LEGENDA_FAIXA_H', '440'))
 LEGENDA_MIN_TEXTO = int(valor('LEGENDA_MIN_TEXTO', '240'))   # pixels brancos mínimos pra contar como legenda
-TITULO_CY = int(valor('TITULO_CY', '1130'))   # centro vertical da caixa de título (pele texto) em 1080×1920
+TITULO_CY = int(valor('TITULO_CY', '1130'))
+# vídeos brutos (editar_bruto.py): velocidade da fala, legenda "palavra" (uma a uma) ou "frase", título "caixa" ou "texto"
+VELOCIDADE_FALA = float(valor('VELOCIDADE_FALA', '1.0'))
+LEGENDA_MODO = valor('LEGENDA_MODO', 'palavra')
+TITULO_MODO = valor('TITULO_MODO', 'caixa')   # centro vertical da caixa de título (pele texto) em 1080×1920
 
 # ---- segredos: variável de ambiente primeiro; no Mac, cai pro Keychain (nunca impressos)
 KEYCHAIN_PUBLER = valor('KEYCHAIN_PUBLER', 'reconecta-publer')

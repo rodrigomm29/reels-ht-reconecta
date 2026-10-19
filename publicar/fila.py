@@ -24,6 +24,10 @@ uso:
   python3 fila.py montar ../planos/ht_sem41_segunda.json  # cria/atualiza a fila (preserva o que já foi postado)
   python3 fila.py ver SEM41-segunda                      # mostra o andamento por rede
   python3 fila.py intercalar SEM41                       # alterna os Reels (VD001, VD002, VD003, VD001…) na ordem de postagem
+  python3 fila.py montar-fotos FOTOS-SEM44               # fila de carrosséis do lote do importar_fotos.py (só Instagram)
+
+Fila de fotos: cada item tem "fotos" (lista de JPEGs, na ordem do carrossel) no lugar de "video"; o publicador vê
+isso e agenda um carrossel no feed do Instagram. TikTok e YouTube ficam "nao_se_aplica" (nunca saem).
 """
 import argparse, datetime as dt, fcntl, json, os, sys, tempfile, unicodedata
 import os as _os, sys as _sys  # noqa: E401
@@ -232,6 +236,77 @@ def montar(plano_path):
            if fora else ''))
     return fila
 
+NAO_SE_APLICA = 'nao_se_aplica'
+REDES_FOTOS = ('instagram',)
+
+def montar_fotos(lote):
+    """Fila <lote> a partir de FOTOS_DIR/<lote>/lote.json (gravado pelo ferramentas/importar_fotos.py)."""
+    lote_json = os.path.join(config.FOTOS_DIR, lote, 'lote.json')
+    if not os.path.exists(lote_json):
+        sys.exit(f'lote {lote} não existe ({lote_json}): rode antes ferramentas/importar_fotos.py {lote}')
+    with open(lote_json, encoding='utf-8') as f:
+        dados = json.load(f)
+    semana = dados['lote']
+    trava = travar_ou_sair(semana, 'fila.py montar-fotos')
+    try:
+        antiga, meta_antiga = {}, {}
+        if os.path.exists(caminho_fila(semana)):
+            velha = carregar(semana)
+            if any(i.get('video') for i in velha['itens']):
+                sys.exit(f'a fila {semana} já existe e é de VÍDEOS: use outro nome de lote. Nada foi gravado.')
+            antiga = {i['id']: i for i in velha['itens']}
+            meta_antiga = {k: v for k, v in velha.items() if k not in ('semana', 'plano', 'itens')}
+        itens, sem_legenda, sem_fotos = [], [], []
+        for p in dados['posts']:
+            fotos = [f for f in p['fotos'] if os.path.isfile(f)]
+            legenda = open(p['legenda'], encoding='utf-8').read().strip() if os.path.isfile(p['legenda']) else ''
+            if len(fotos) != len(p['fotos']) or not fotos:
+                sem_fotos.append(p['id'])
+            if not legenda:
+                sem_legenda.append(p['id'])
+            item = {
+                'id': p['id'], 'nome': p['nome'], 'fotos': p['fotos'], 'legenda': legenda,
+                'bytes': sum(os.path.getsize(f) for f in fotos),
+                'estado': {r: ({'status': 'pendente'} if r in REDES_FOTOS else {'status': NAO_SE_APLICA})
+                           for r in REDES},
+            }
+            if p['id'] in antiga:                            # preserva o que já foi postado/tentado
+                item['estado'] = antiga[p['id']]['estado']
+                completar_redes(item)
+                st = item['estado']['instagram']['status']
+                if st != 'pendente' and (item['legenda'] != antiga[p['id']].get('legenda')
+                                         or item['fotos'] != antiga[p['id']].get('fotos')):
+                    print(f'aviso: {p["id"]} já está "{st}" no Instagram; a legenda/fotos novas NÃO mudam o post '
+                          'que já foi pro Publer (edite lá)')
+            itens.append(item)
+        if sem_fotos or sem_legenda:
+            sys.exit('Nada foi gravado. Antes de montar a fila:'
+                     + (f'\n  fotos faltando em: {", ".join(sem_fotos)} (reimporte com --de-novo)' if sem_fotos else '')
+                     + (f'\n  legenda vazia em: {", ".join(sem_legenda)} '
+                        f'(escreva em {os.path.join(config.FOTOS_DIR, lote)}/<id>/legenda.txt)' if sem_legenda else ''))
+        ids = {i['id'] for i in itens}
+        fora = []
+        for rid, velho in antiga.items():                    # saiu do lote: só some se nunca saiu
+            if rid in ids or so_pendente_fotos(velho):
+                continue
+            velho = dict(velho)
+            velho['fora_do_plano'] = True
+            itens.append(velho)
+            fora.append(rid)
+        fila = {'semana': semana, 'plano': os.path.abspath(lote_json), 'tipo': 'carrossel', **meta_antiga,
+                'itens': itens}
+        salvar(fila)
+    finally:
+        os.close(trava)
+    print(f'fila {semana}: {len(itens)} carrossel(éis), {sum(len(i["fotos"]) for i in itens)} fotos'
+          + (f'\n  fora do lote, mas já saíram/tentaram sair (mantidos, marcados "fora_do_plano"): {fora}' if fora else ''))
+    print(f'próximo passo: python3 publicar/publer_postar.py postar {semana} --rede instagram '
+          '--inicio "AAAA-MM-DD HH:MM" --horarios "12:00" --simular')
+    return fila
+
+def so_pendente_fotos(item):
+    return all(v.get('status') in ('pendente', NAO_SE_APLICA) for v in (item.get('estado') or {}).values())
+
 def ver(semana):
     fila = carregar(semana)
     for r in REDES:
@@ -264,9 +339,12 @@ def main():
     m = sub.add_parser('montar'); m.add_argument('plano')
     v = sub.add_parser('ver'); v.add_argument('semana')
     t = sub.add_parser('intercalar'); t.add_argument('semana')
+    f = sub.add_parser('montar-fotos'); f.add_argument('lote')
     a = ap.parse_args()
     if a.cmd == 'montar':
         montar(a.plano)
+    elif a.cmd == 'montar-fotos':
+        montar_fotos(a.lote)
     elif a.cmd == 'intercalar':
         intercalar(a.semana)
     else:
