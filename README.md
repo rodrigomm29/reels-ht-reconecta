@@ -279,6 +279,13 @@ python3 publer_postar.py postar FOTOS-SEM44 --rede instagram --inicio "2026-10-2
 - **Pasta já importada** é pulada. Para refazer, use `--de-novo "nome da pasta"`; a legenda já escrita é mantida.
 - **CFM:** só foto com autorização escrita da paciente, legenda educativa, sem promessa de resultado e sem preço.
 
+### 5.11 Limpeza semanal
+```bash
+python3 ferramentas/limpeza.py            # mostra o que sairia e quanto espaço libera
+python3 ferramentas/limpeza.py --apagar   # manda para a Lixeira do Mac
+```
+Sai: sobras de render e de transcrição, vídeos de post que o Publer já publicou (agendado nunca sai) e o que estiver em `planos/_descartados.json`. Não toca em `dados/videos`, transcrições, edições, planos, filas nem na pasta do iCloud.
+
 ---
 
 ## 6. Estilos

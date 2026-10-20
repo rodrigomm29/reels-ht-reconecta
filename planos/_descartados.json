@@ -1,0 +1,20 @@
+{
+ "_sobre": "Caminhos (relativos à raiz do projeto) que a ferramentas/limpeza.py manda para a Lixeira. Só ponha aqui o que foi descartado de vez: teste reprovado, versão substituída.",
+ "caminhos": [
+  "saida/SEM44/segunda",
+  "saida/SEM00/terça",
+  "saida/brutos/BRT1",
+  "saida/brutos/BR002",
+  "dados/videos/2026-07-08_DajCq0guecPF.mp4",
+  "dados/videos/2026-07-10_DaoGp4luB9yF.mp4",
+  "dados/videos/2026-08-07_DbvnjRxuefzF.mp4",
+  "dados/videos/2026-10-08_BR002.mp4",
+  "dados/videos/2026-10-08_BR002E.mp4",
+  "dados/videos/2026-10-08_BRT1E.mp4",
+  "dados/broll_fernanda",
+  "dados/antes_depois",
+  "dados/brutos/BR002_cenas",
+  "dados/transcricoes_whisper",
+  "brutos/entrada/teste2-cenas"
+ ]
+}

@@ -1028,15 +1028,17 @@ def juntar_ocupados(*listas):
     return saida
 
 
-def gerar_horarios(inicio, horarios, n, piso, ocupados=()):
+def gerar_horarios(inicio, horarios, n, piso, ocupados=(), rodizio=False):
     """N horários a partir do --inicio, nos horários do dia (já cortados pelo --por-dia), nunca antes do piso.
-    Horário a menos de 1 min de um post já agendado na mesma conta/rede (`ocupados`) é pulado."""
+    Horário a menos de 1 min de um post já agendado na mesma conta/rede (`ocupados`) é pulado.
+    rodizio=True (--rodizio): 1 post por dia, alternando os horários da lista dia a dia (12:30, 19:30, 21:00,
+    12:30…), para aprender qual horário funciona."""
     ocupados = list(ocupados)
     saida, dia = [], inicio.date()
-    for _ in range(3660):
+    for k in range(3660):
         if len(saida) >= n:
             break
-        for h in horarios:
+        for h in ([horarios[k % len(horarios)]] if rodizio else horarios):
             q = dt.datetime.combine(dia, h, tzinfo=FUSO)
             if q >= inicio and q >= piso and not colide(q, ocupados) and len(saida) < n:
                 saida.append(q)
@@ -1748,12 +1750,13 @@ def planejar(fila, args, horarios, por_dia, inicio, externos=None):
     selecionados, pulados, a_conferir = selecionar(fila['itens'], args)
     ignorar = {(fila['semana'], rid) for rid in args.forcar}
     ocupados = juntar_ocupados(agenda_da_rede(args.rede, ignorar), externos or [])
-    grade = horarios[:por_dia]
+    rodizio = getattr(args, 'rodizio', False)
+    grade = horarios if rodizio else horarios[:por_dia]
     piso = dt.datetime.now(FUSO) + MARGEM_PLANO
-    slots = gerar_horarios(inicio, grade, len(selecionados), piso, ocupados)
+    slots = gerar_horarios(inicio, grade, len(selecionados), piso, ocupados, rodizio=rodizio)
     plano = list(zip(selecionados, slots))
     pulados_ocup, passados = [], []
-    if slots:
+    if slots and not rodizio:
         usados = set(slots)
         d = inicio.date()
         while d <= slots[-1].date():
@@ -3285,6 +3288,8 @@ def montar_parser(rede_fixa=None):
     p.add_argument('--max', type=int, help='no máximo N vídeos nesta rodada')
     p.add_argument('--inicio', required=True, help='"AAAA-MM-DD HH:MM", horário de Brasília')
     p.add_argument('--horarios', help=f'horários do dia, ex.: "{HORARIOS_PADRAO}" (padrão)')
+    p.add_argument('--rodizio', action='store_true',
+                   help='1 post por dia, alternando os --horarios dia a dia (para testar horário)')
     p.add_argument('--intervalo', type=int, metavar='MIN',
                    help='em vez de --horarios: N horários (--por-dia) a partir da hora do --inicio, de MIN em MIN; '
                         'o resto vai pro dia seguinte no mesmo horário de início')
