@@ -70,6 +70,11 @@ Quantos ganchos: 3 (A, B, C). Eles viram 3 vídeos que precisam parecer DIFERENT
    - Sem promessa de resultado.
    - Uma frase como a Fernanda falaria, por exemplo "Seu rosto não está cansado, está sem sustentação".
    - Os 3 títulos diferentes entre si.
+   - **Título local (teste desde 27/10/2026):** escreva também, em cada gancho, `titulo_local`: o mesmo título com a
+     região, para viralizar localmente. Ex.: "Harmonização facial em João Pessoa", "Rosto cansado? Tratamento em João Pessoa",
+     "Ultherapy em João Pessoa, sem cirurgia". Até 45 caracteres (máximo 55), com "João Pessoa" escrito por extenso,
+     natural, sem dois-pontos. O plano usa o `titulo_local` em UMA versão de cada Reel (a que mostra o título na tela);
+     as outras ficam com o `titulo` normal.
    - **Posição:** a caixa de título fica, por padrão, abaixo da legenda (y≈1470). Se no gancho aparecer foto, antes/depois ou imagem importante na metade de baixo da tela (confira os quadros), ponha `"titulo_cy": 330` no gancho: o título sobe para o alto e não cobre a imagem.
 6. **Se `dur` > 175 s,** liste também `cortes_versao_curta`: frases inteiras de desvio que podem sair sem quebrar o argumento.
    - As bordas ficam no silêncio e entre blocos de legenda, conferidas no `blocos_legenda.py`.
@@ -87,7 +92,7 @@ Quantos ganchos: 3 (A, B, C). Eles viram 3 vídeos que precisam parecer DIFERENT
 Grave no caminho indicado no seu pedido, exatamente:
 ```json
 {"vd":"VD00X","shortcode":"...","duracao":0.0,
- "hooks":{"A":{"inicio":0.0,"fim":0.0,"texto":"literal","angulo":"dor","titulo":"...","titulo_cy":null,"fim_video":null,"ini_corte_min":null,"obs":""},"B":{},"C":{}},
+ "hooks":{"A":{"inicio":0.0,"fim":0.0,"texto":"literal","angulo":"dor","titulo":"...","titulo_local":"... em João Pessoa","titulo_cy":null,"fim_video":null,"ini_corte_min":null,"obs":""},"B":{},"C":{}},
  "momentos":[], "cortes_versao_curta":[], "legendas":{"A":"...","B":"...","C":"..."}, "obs":"..."}
 ```
 Devolva o mesmo JSON como resposta final (só o JSON).

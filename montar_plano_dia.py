@@ -114,11 +114,17 @@ def main():
             if all(not (p == 'manchete' and x == 'pergunta') for p, x in zip(ordem, ab)):
                 break
         hooks = {}
-        for (l, h), pele, abertura in zip(sorted(d['hooks'].items()), ordem, ab):
-            hk = {'inicio': h['inicio'], 'fim': h['fim'], 'texto': h['texto'], 'titulo': h['titulo'],
-                  'pele': pele, 'abertura': abertura}
+        # título local (27/10/2026): UMA versão por Reel leva a região no título ("… em João Pessoa"), para medir se
+        # viraliza mais na cidade. No clean é a versão "texto" (a única com título na tela); nos outros, roda A/B/C.
+        local = ordem.index('texto') if 'texto' in ordem else i % 3
+        for n, ((l, h), pele, abertura) in enumerate(zip(sorted(d['hooks'].items()), ordem, ab)):
+            usa_local = n == local and bool(h.get('titulo_local'))
+            hk = {'inicio': h['inicio'], 'fim': h['fim'], 'texto': h['texto'],
+                  'titulo': h['titulo_local'] if usa_local else h['titulo'], 'pele': pele, 'abertura': abertura}
+            if usa_local:
+                hk['titulo_local'] = True
             if a.estilo == 'dividida':
-                hk['headline'] = h['titulo']
+                hk['headline'] = hk['titulo']
             for k in ('fim_video', 'ini_corte_min', 'titulo_cy'):
                 if h.get(k) is not None:
                     hk[k] = h[k]
