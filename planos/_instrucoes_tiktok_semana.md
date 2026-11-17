@@ -1,6 +1,6 @@
 # Rotina semanal do TikTok (tarefa agendada, toda segunda)
 
-Projeto: /Users/rodrigomadruga/projetos/reels-ht (branch fernanda). Nunca imprima chaves; nunca agende sem o OK do Rodrigo.
+Projeto: /Users/rodrigomadruga/projetos/clinica/reels-ht (branch fernanda). Nunca imprima chaves; nunca agende sem o OK do Rodrigo.
 
 1. `python3 publicar/tiktok_semana.py` (baixa os reels recentes do perfil, escolhe a versão vencedora dos Trials
    e monta `publicar/filas/TIKTOK-<data>.json` continuando o rodízio 12:30 / 19:30 / 21:00).
