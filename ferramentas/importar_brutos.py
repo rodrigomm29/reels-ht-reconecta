@@ -24,6 +24,8 @@ import datetime, glob, json, os, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sdr import garantir_sdr  # noqa: E402
 
 ENTRADA = os.path.join(config.PROJETO, 'brutos', 'entrada')
 REG_DIR = os.path.join(config.REELS_BASE, 'brutos')
@@ -54,7 +56,9 @@ def duracao(arq):
 
 
 def normalizar(origem, destino, audio=True):
-    """1080×1920 30 fps CFR. Deitado ou fora de 9:16 é recortado no centro (sem esticar)."""
+    """1080×1920 30 fps CFR. Deitado ou fora de 9:16 é recortado no centro (sem esticar). HDR do iPhone passa
+    antes pelo ajuste de tom do macOS (sem ele a pele sai branca demais, 27/10/2026)."""
+    origem = garantir_sdr(origem, os.path.join(config.REELS_BASE, 'brutos', '_tmp', 'sdr'))
     vf = ('scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,'
           'fps=30,setsar=1,format=yuv420p')
     subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', origem, '-vf', vf,

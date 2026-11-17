@@ -59,6 +59,8 @@ def ja_no_tiktok():
         for i in d.get('itens', []):
             r = i.get('reel', '')
             ja.add(r)
+            if i.get('reel_instagram'):          # post manual do mesmo vídeo no perfil (shortcode diferente do BRnnn)
+                ja.add(i['reel_instagram'])
             ja.add(r[:-1] if r.endswith(('E', 'F')) else r)
             ja.add(r.rstrip('FE'))
     return ja

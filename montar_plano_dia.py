@@ -102,6 +102,10 @@ def main():
             raise SystemExit(f'{sc}: vídeo ou transcrição não encontrado')
         lista = {'clean': PELES_CLEAN, 'dividida': ['dividida'] * 3}.get(a.estilo, PELES)
         ordem = [lista[(i + k) % 3] for k in range(3)]           # A, B, C
+        # Reel curto com menos de 3 ganchos: a versão com título na tela não pode ficar de fora
+        if 'texto' in ordem[len(d['hooks']):]:
+            ordem.remove('texto')
+            ordem.insert(len(d['hooks']) - 1, 'texto')
         # abertura: escolhe o padrão cuja "pergunta" não cai na manchete
         for desl in range(3):
             if a.estilo == 'clean':

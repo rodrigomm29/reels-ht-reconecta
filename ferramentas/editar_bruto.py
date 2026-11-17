@@ -303,6 +303,8 @@ def main():
 
     velocidade = V
     pals_out = [(s_ / V, e_ / V, t_) for s_, e_, t_ in pals]
+    if pals_out:                                  # corte que começa no meio da fala: a 1ª legenda abre em maiúscula
+        pals_out[0] = (pals_out[0][0], pals_out[0][1], pals_out[0][2][:1].upper() + pals_out[0][2][1:])
     leg_modo = ed.get('legenda_modo', config.LEGENDA_MODO)
     tit_modo = ed.get('titulo_modo', config.TITULO_MODO)
     # a foto que abre o vídeo junto com o título reserva o alto da tela pro título
